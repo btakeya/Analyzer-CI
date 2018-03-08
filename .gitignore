@@ -21,3 +21,5 @@ report.json
 /public/dist
 /tmp
 /bin
+**/build
+.gradle

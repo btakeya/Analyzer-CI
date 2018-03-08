@@ -20,3 +20,4 @@ report.json
 /public/node_modules
 /public/dist
 /tmp
+/bin

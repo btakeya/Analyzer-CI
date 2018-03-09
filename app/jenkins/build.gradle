@@ -1,32 +1,10 @@
-import java.util.regex.Matcher
-
-// Following parameters must be passed by build.sbt
-// appVersion
-// organization
-// shortName
-// commonJarPath
-
 plugins {
     id "org.jenkins-ci.jpi" version "0.25.0"
 }
 
-group = "$organization"
-version = "$appVersion"
+group = "com.kstreee"
+version = "1.0.0"
 description = "A plugin written in scala"
-
-apply plugin: 'scala'
-
-tasks.withType(ScalaCompile) {
-    // Use incremental compilation
-    //scalaCompileOptions.useAnt = false
-    // Enable Scala warnings output
-    scalaCompileOptions.additionalParameters = ["-Yresolve-term-conflict:object"]
-    targetCompatibility = 1.8
-}
-
-sourceSets.main.scala.srcDir "src/main/java"
-sourceSets.main.java.srcDirs = []
-sourceSets.main.output.classesDir = new File(buildDir, "classes/main")
 
 jenkinsPlugin {
     // Version of Jenkins core this plugin depends on.
@@ -38,7 +16,7 @@ jenkinsPlugin {
     // Plugin URL on GitHub. Optional.
     gitHubUrl = "https://github.com/kstreee/analyzer-github-CI"
     // Plugin ID, defaults to the project name without trailing '-plugin'
-    shortName = "$shortName"
+    shortName = "analyzer-github-CI-jenkins"
 
     // The developers section is optional, and corresponds to the POM developers section.
     developers {
@@ -49,48 +27,19 @@ jenkinsPlugin {
         }
     }
 
+    // Set output directory to root project's bin.
+    libsDirName = "../../../bin"
     dependencies {
-        runtime group: 'org.scala-lang', name: 'scala-library', version: "$scalaVersion"
-        compile group: 'org.scala-lang', name: 'scala-library', version: "$scalaVersion"
-        runtime group: 'org.scala-lang', name: 'scala-compiler', version: "$scalaVersion"
-        compile files("$commonJarPath")
+        compile files("$libsDir/common.jar")
     }
 }
 
-task annotate(dependsOn:compileScala, type: Exec)  {
-    if (logging.level >= LogLevel.INFO) {
-        args '-verbose'
-    }
-
-    doFirst{
-        libsDirName = "$outputRelativePath"
-        args '-proc:only'
-        args '-d'
-        args compileJava.destinationDir
-        args '-classpath'
-        args compileJava.classpath.getAsPath() + java.io.File.pathSeparatorChar + compileJava.destinationDir
-
-        if (logging.level >= LogLevel.INFO) {
-            args '-verbose'
-        }
-
-        fileTree(compileScala.destinationDir).each { File file ->
-            if(file.path.contains('META-INF')) {
-                return
-            }
-            if(!file.path.endsWith('class')) {
-                return
-            }
-            args file
-                .path
-                .minus(compileScala.destinationDir)
-                .minus('.class')
-                .substring(1)
-                .replaceAll(Matcher.quoteReplacement(File.separator),'.')
-        }
-    }
-
-    executable "javac"
+// To use common library, run it before every kinds of build in this gradle.
+task buildCommonLibrary(type: Exec) {
+    // TODO, windows version of command
+    workingDir = "${project.rootDir}../../../"
+    println("working dir : $workingDir")
+    commandLine "sbt", "buildCommonLibrary"
 }
 
-compileScala.doLast {annotate.execute()}
+build.dependsOn buildCommonLibrary

@@ -30,6 +30,5 @@ object CLIApp extends App {
     }
   }
 
-  def fire(args: T): Unit = Await.result(analysis(args), Duration.Inf)
-  def main(args: Array[String]): Unit = fire(args)
+  def main(args: T): Unit = Await.result(analysis(args), Duration.Inf)
 }

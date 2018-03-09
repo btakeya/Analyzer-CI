@@ -1,3 +1,6 @@
+import sbt._
+import Keys._
+
 lazy val commonSettings = Seq(
   organization := "com.kstreee.ci",
   version := "1.0.0",
@@ -38,83 +41,35 @@ lazy val commonSettings = Seq(
   test in assembly := {}
 )
 
+lazy val jarOutputPath = settingKey[File]("Common library output path.")
+def jarOutputPathSetting(defaultPath: File, binaryName: String) = Seq(
+  jarOutputPath := Option(System.getProperty("jarOutputPath"))
+    .map { path => file(path) / binaryName }
+    .getOrElse { defaultPath / binaryName }
+)
+
 lazy val common = (project in file("./app/common")).
   settings(commonSettings: _*).
+  settings(jarOutputPathSetting(file("bin"), "common.jar"): _*).
   settings(
     name := "common",
-
     // sbt-assembly settings
-    assemblyOutputPath in assembly := file("bin/common.jar")
+    assemblyOutputPath in assembly := jarOutputPath.value
   )
 
 lazy val cli = (project in file("./app/cli")).
   settings(commonSettings: _*).
+  settings(jarOutputPathSetting(file("bin"), "cli.jar"): _*).
   settings(
     name := "cli",
-
     // Specify main class
     mainClass in Compile := Some("com.kstreee.ci.app.CLIApp"),
 
     // sbt-assembly settings
     mainClass in assembly := Some("com.kstreee.ci.app.CLIApp"),
-    assemblyOutputPath in assembly := file("bin/cli.jar")
+    assemblyOutputPath in assembly := jarOutputPath.value
   ).dependsOn(common)
 
-lazy val jenkins = (project in file("./app/jenkins")).
-  settings(commonSettings: _*).
-  settings(
-    name := "jenkins",
-
-    // Compiler order
-    compileOrder := CompileOrder.JavaThenScala,
-
-    // Compile options
-    scalacOptions := List("-Yresolve-term-conflict:object"),
-
-    // Resolvers
-    resolvers += "jenkins-plugin" at "https://repo.jenkins-ci.org/releases/",
-    resolvers += "jenkins-plugin-public" at "https://repo.jenkins-ci.org/public/",
-
-    // Jenkins framework
-    libraryDependencies += "org.jenkins-ci.main" % "jenkins-core" % "2.109" % "provided",
-    libraryDependencies += "javax.servlet" % "javax.servlet-api" % "4.0.0" % "provided",
-
-    // Specify main class
-    mainClass in Compile := Some("com.kstreee.ci.app.JenkinsApp")
-  ).dependsOn(common)
-
-lazy val buildJenkins = taskKey[Unit]("A task to build jenkins module")
-buildJenkins := {
-  val stream: TaskStreams = streams.value
-
-  // Build common to use it
-  (assembly in (common, assembly)).value
-
-  // Build cmd
-  val basePath = baseDirectory.value / "app" / "jenkins"
-  val gradle: String = {
-    if (sys.props("os.name").contains("Windows")) (basePath / "gradlew.bat").toString
-    else (basePath / "gradlew").toString
-  }
-
-  val shortName: String = "analyzer-github-CI"
-  val options: List[String] = List(
-    "jpi",
-    s"-PscalaVersion=${scalaVersion.value}",
-    s"-PappVersion=${version.value}",
-    s"-Porganization=com.kstreee",
-    s"-PshortName=$shortName",
-    s"-PcommonJarPath=${(baseDirectory.value / "bin"/ "common.jar").toString}",
-    s"-PoutputRelativePath=../../../bin"
-  )
-
-  // Trigger gradle
-  stream.log.info(s"Building a jenkins module using Gradle.\n${(gradle::options).mkString(" ")}")
-
-  import scala.sys.process.Process
-  if (Process(gradle::options, new File(basePath.toString)).! == 0) {
-    stream.log.success("Succeeded to build a jenkins module.")
-  } else {
-    throw new IllegalStateException("Failed to build a jenkins module.")
-  }
-}
+// Explicit build command to provde common library to other build systems such as Gradle.
+lazy val buildCommonLibrary = taskKey[Unit]("A task to build a common library")
+buildCommonLibrary := (assembly in (common, assembly)).value

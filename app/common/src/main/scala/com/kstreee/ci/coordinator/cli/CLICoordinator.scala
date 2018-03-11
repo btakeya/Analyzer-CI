@@ -54,7 +54,8 @@ object CLICoordinator extends Coordinator {
     )
     val stdout = new StringBuffer
     val stderr = new StringBuffer
-    val process = Process(cmd, new File(sourcecodePath.toString)).run(ProcessLogger(line => stdout append line append "\n", line => stderr append line append "\n"))
+    val process = Process(cmd, new File(sourcecodePath.toString))
+      .run(ProcessLogger(line => stdout append line append "\n", line => stderr append line append "\n"))
     logger.info(s"Done : ${process.exitValue()}")
     Future(Some(stdout.toString))
   }

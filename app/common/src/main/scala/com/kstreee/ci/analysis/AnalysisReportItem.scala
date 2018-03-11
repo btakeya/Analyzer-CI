@@ -2,10 +2,10 @@ package com.kstreee.ci.analysis
 
 final case class AnalysisReportItem(path: String,
                                     filename: String,
-                                    author: String,
                                     line: Int,
                                     column: Int,
-                                    message: String) {
+                                    message: String,
+                                    author: Option[String] = None) {
   override def toString: String = {
     s"""
        |path : $path

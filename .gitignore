@@ -21,5 +21,7 @@ report.json
 /public/dist
 /tmp
 /bin
-**/build
-.gradle
+
+/app/jenkins/build
+/app/jenkins/.gradle
+/app/jenkins/work

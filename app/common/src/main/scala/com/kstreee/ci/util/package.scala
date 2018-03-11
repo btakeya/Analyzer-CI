@@ -1,7 +1,5 @@
 package com.kstreee.ci
 
-import java.nio.file.{Files, Path}
-
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json.{JsError, JsResult}
 import play.api.libs.ws.ahc._

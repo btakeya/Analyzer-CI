@@ -61,15 +61,23 @@ object GitHubIssueReporter extends Reporter {
     )
   }
 
-  private def author(bug: AnalysisReportItem): String = if (bug.author != null && bug.author.trim != "") s"by @${bug.author.trim}" else ""
-  private def position(bug: AnalysisReportItem): String = s"at ${bug.path}:${bug.line}:${bug.column}"
+  private def author(bug: AnalysisReportItem): String = {
+    if (bug.author != null) bug.author.map(_.trim).filter(_.trim != "").map(s => s"by $s").getOrElse("")
+    else ""
+  }
+
+  private def position(bug: AnalysisReportItem): String = {
+    s"at ${bug.path}:${bug.line}:${bug.column}"
+  }
+
   private def getIssueComment(analysisReport: AnalysisReport)(implicit ctx: ExecutionContext): Future[Option[GitHubIssueComment]] = {
     if (analysisReport == null || analysisReport.items == null || analysisReport.items.isEmpty) {
       Future(None)
     } else {
-      val bugs = analysisReport.items.map(item =>
-        if (item == null) "" else s"- [ ] by ${author(item)} at ${position(item)} : ${item.message}"
-      ).mkString("\n")
+      val bugs = analysisReport.items.map { item =>
+        if (item == null) ""
+        else s"- [ ] ${List(author(item), position(item), item.message).filter(_.trim == "").mkString(" ")}"
+      } mkString "\n"
       Future(Some(GitHubIssueComment(s"An Analysis Result of ${analysisReport.analyzerConfig.name}.\n$bugs")))
     }
   }

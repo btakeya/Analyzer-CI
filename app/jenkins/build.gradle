@@ -6,6 +6,12 @@ group = "com.kstreee"
 version = "1.0.0"
 description = "A plugin written in scala"
 
+apply plugin: 'checkstyle'
+checkstyle {
+    toolVersion = '8.8'
+    configFile = file("${rootProject.projectDir}/checkstyle-google.xml")
+}
+
 jenkinsPlugin {
     // Version of Jenkins core this plugin depends on.
     coreVersion = "1.647"
@@ -21,6 +27,7 @@ jenkinsPlugin {
     // The developers section is optional, and corresponds to the POM developers section.
     developers {
         developer {
+
             id "kstreee"
             name "Sol Kim"
             email "kstreee@gmail.com"

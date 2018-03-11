@@ -7,17 +7,17 @@ import com.kstreee.ci.storage.json.AnalysisConfigLoad
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json.Json
 
-import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.Duration
+import scalaz.OptionT._
+import scalaz.std.scalaFuture._
 
-object CLIApp extends App {
+object CLIApp {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   private val logger = Logger[this.type]
 
-  override type T = Array[String]
-
-  override def loadConfig(args: T): Future[Option[AnalysisConfig]] = {
+  private def loadConfig(args: Array[String]): Future[Option[AnalysisConfig]] = {
     if (args == null || args.isEmpty) {
       logger.error("Failed to parse option path")
       Future(None)
@@ -30,5 +30,14 @@ object CLIApp extends App {
     }
   }
 
-  def main(args: T): Unit = Await.result(analysis(args), Duration.Inf)
+  def main(args: Array[String]): Unit = {
+    val analysis =
+      (for {
+        // parse arguments & configurations
+        analysisConfig <- optionT(loadConfig(args))
+        // run an analysis and report a result
+        result <- optionT(App.analysis(analysisConfig))
+      } yield result).run
+    Await.result(analysis, Duration.Inf)
+  }
 }

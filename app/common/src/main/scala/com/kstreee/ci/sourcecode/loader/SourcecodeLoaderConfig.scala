@@ -6,4 +6,3 @@ import com.kstreee.ci.sourcecode.unloader.SourcecodeUnloaderConfig
 trait SourcecodeLoaderConfig extends Config {
   val sourcecodeUnloaderConfig: Option[SourcecodeUnloaderConfig]
 }
-

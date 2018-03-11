@@ -38,12 +38,12 @@ object PylintAnalyzer extends Analyzer {
     } else {
       (for {
         items <- optionT(lift(Try(summary.items.map(r => AnalysisReportItem(
-          r.path,
-          "",
-          "",
-          r.line,
-          r.column,
-          r.message
+          path = r.path,
+          filename = "",
+          line = r.line,
+          column = r.column,
+          message = r.message,
+          author = None
         )))))
       } yield {
         AnalysisReport(analyzerConfig, items)

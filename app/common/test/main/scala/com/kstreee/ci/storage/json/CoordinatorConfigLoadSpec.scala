@@ -22,7 +22,24 @@ class CoordinatorConfigLoadSpec(implicit ee: ExecutionEnv) extends Specification
       } yield {
         result must beSome[CoordinatorConfig]
         result.get must anInstanceOf[CLICoordinatorConfig]
-        result.get.asInstanceOf[CLICoordinatorConfig].timeoutSeconds mustEqual timeoutSeconds
+        result.get.asInstanceOf[CLICoordinatorConfig].timeoutSeconds must beSome(timeoutSeconds)
+      }).await
+    }
+
+    "valid cli coordinator json with empty timeout" in {
+      val name = CoordinatorConfigLoad.cliName
+      val timeoutSeconds = 123
+      val json = s"""
+                    |{
+                    |  "name": "$name"
+                    |}
+      """.stripMargin
+      (for {
+        result <- CoordinatorConfigLoad.load(Json.parse(json))
+      } yield {
+        result must beSome[CoordinatorConfig]
+        result.get must anInstanceOf[CLICoordinatorConfig]
+        result.get.asInstanceOf[CLICoordinatorConfig].timeoutSeconds must beNone
       }).await
     }
   }

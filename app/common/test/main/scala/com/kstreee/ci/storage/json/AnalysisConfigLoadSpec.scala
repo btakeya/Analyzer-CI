@@ -52,7 +52,7 @@ class AnalysisConfigLoadSpec(implicit ee: ExecutionEnv) extends Specification {
         result.get.analyzerConfig.asInstanceOf[PylintAnalyzerConfig].analysisCmd must containTheSameElementsAs(analysisCmd)
 
         result.get.coordinatorConfig must anInstanceOf[CLICoordinatorConfig]
-        result.get.coordinatorConfig.asInstanceOf[CLICoordinatorConfig].timeoutSeconds mustEqual timeoutSeconds
+        result.get.coordinatorConfig.asInstanceOf[CLICoordinatorConfig].timeoutSeconds must beSome(timeoutSeconds)
 
         result.get.sourcecodeLoaderConfig must anInstanceOf[FileSystemSourcecodeLoaderConfig]
         result.get.sourcecodeLoaderConfig.asInstanceOf[FileSystemSourcecodeLoaderConfig].sourcePath mustEqual sourcePath

@@ -2,7 +2,7 @@ package com.kstreee.ci.app
 
 import java.nio.file.{Files, Paths}
 
-import com.kstreee.ci.analysis.AnalysisConfig
+import com.kstreee.ci.analysis.{Analysis, AnalysisConfig}
 import com.kstreee.ci.storage.json.AnalysisConfigLoad
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json.Json
@@ -12,7 +12,7 @@ import scala.concurrent.duration.Duration
 import scalaz.OptionT._
 import scalaz.std.scalaFuture._
 
-object CLIApp {
+object CLIApp extends Analysis {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   private val logger = Logger[this.type]
@@ -31,13 +31,13 @@ object CLIApp {
   }
 
   def main(args: Array[String]): Unit = {
-    val analysis =
+    val res =
       (for {
         // parse arguments & configurations
         analysisConfig <- optionT(loadConfig(args))
         // run an analysis and report a result
-        result <- optionT(App.analysis(analysisConfig))
+        result <- optionT(analysis(analysisConfig))
       } yield result).run
-    Await.result(analysis, Duration.Inf)
+    Await.result(res, Duration.Inf)
   }
 }

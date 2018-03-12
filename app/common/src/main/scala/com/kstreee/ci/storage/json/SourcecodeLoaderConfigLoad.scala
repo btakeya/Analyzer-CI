@@ -6,13 +6,15 @@ import com.kstreee.ci.sourcecode.loader.fs.FileSystemSourcecodeLoaderConfig
 import com.kstreee.ci.sourcecode.loader.git.branch.GitBranchLoaderConfig
 import com.kstreee.ci.sourcecode.loader.git.commit.GitCommitLoaderConfig
 import com.kstreee.ci.storage.ConfigLoad
-import play.api.libs.json.{JsPath, JsResult, JsValue, Reads}
+import com.typesafe.scalalogging.Logger
+import play.api.libs.json._
 import play.api.libs.functional.syntax._
 
 import scala.concurrent.{ExecutionContext, Future}
 
 object SourcecodeLoaderConfigLoad extends ConfigLoad {
-  override type T = JsValue
+  private val logger = Logger[this.type]
+
   override type U = SourcecodeLoaderConfig
   override def load(data: T)(implicit ctx: ExecutionContext): Future[Option[U]] = {
     val config =
@@ -44,7 +46,9 @@ object SourcecodeLoaderConfigLoad extends ConfigLoad {
       case _ if fileSystemName.equalsIgnoreCase(name) => fileSystemReads.reads(data)
       case _ if gitCommitName.equalsIgnoreCase(name) => gitCommitReads.reads(data)
       case _ if gitBranchName.equalsIgnoreCase(name) => gitBranchReads.reads(data)
-      case _ => throw new NotImplementedError(s"Not implemented, $name")
+      case _ =>
+        logger.warn(s"Not implemented, $name")
+        JsError(s"Not implemented, $name")
     }
   }
 }

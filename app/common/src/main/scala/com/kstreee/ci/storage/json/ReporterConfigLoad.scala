@@ -6,13 +6,15 @@ import com.kstreee.ci.reporter.cli.json.CLIJsonReporterConfig
 import com.kstreee.ci.reporter.cli.plain.CLIPlainReporterConfig
 import com.kstreee.ci.reporter.github.issue.GitHubIssueReporterConfig
 import com.kstreee.ci.storage.ConfigLoad
+import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 
 import scala.concurrent.{ExecutionContext, Future}
 
 object ReporterConfigLoad extends ConfigLoad {
-  override type T = JsValue
+  private val logger = Logger[this.type]
+
   override type U = ReporterConfig
   override def load(data: T)(implicit ctx: ExecutionContext): Future[Option[U]] = {
     val config =
@@ -41,7 +43,9 @@ object ReporterConfigLoad extends ConfigLoad {
       case _ if cliPlainName.equalsIgnoreCase(name) => cliPlainReads.reads(data)
       case _ if cliJsonName.equalsIgnoreCase(name) => cliJsonReads.reads(data)
       case _ if githubIssueName.equalsIgnoreCase(name) => githubIssueReads.reads(data)
-      case _ => throw new NotImplementedError(s"Not implemented, $name")
+      case _ =>
+        logger.warn(s"Not implemented, $name")
+        JsError(s"Not implemented, $name")
     }
   }
 }

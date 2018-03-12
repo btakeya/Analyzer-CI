@@ -4,12 +4,14 @@ import com.kstreee.ci.util._
 import com.kstreee.ci.coordinator.CoordinatorConfig
 import com.kstreee.ci.coordinator.cli.CLICoordinatorConfig
 import com.kstreee.ci.storage.ConfigLoad
-import play.api.libs.json.{JsPath, JsResult, JsValue, Reads}
+import com.typesafe.scalalogging.Logger
+import play.api.libs.json._
 
 import scala.concurrent.{ExecutionContext, Future}
 
 object CoordinatorConfigLoad extends ConfigLoad {
-  override type T = JsValue
+  private val logger = Logger[this.type]
+
   override type U = CoordinatorConfig
   override def load(data: T)(implicit ctx: ExecutionContext): Future[Option[U]] = {
     val config =
@@ -22,12 +24,14 @@ object CoordinatorConfigLoad extends ConfigLoad {
 
   private[json] val cliName: String = "cli"
   private[json] val cliReads: Reads[CoordinatorConfig] =
-    (JsPath \ "timeout_seconds").read[Int].map(timeoutSeconds => CLICoordinatorConfig(timeoutSeconds))
+    (JsPath \ "timeout_seconds").readNullable[Int].map(timeoutSeconds => CLICoordinatorConfig(timeoutSeconds))
 
   private[json] def loadConfigByName(name: String, data: T): JsResult[U] = {
     name match {
       case _ if cliName.equalsIgnoreCase(name) => cliReads.reads(data)
-      case _ => throw new NotImplementedError(s"Not implemented, $name")
+      case _ =>
+        logger.warn(s"Not implemented, $name")
+        JsError(s"Not implemented, $name")
     }
   }
 }

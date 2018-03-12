@@ -32,11 +32,10 @@ object CLICoordinator extends Coordinator {
 
     // Blocking until an analysis done based.
     val report: Option[String] =
-      if (coordinatorConfig.timeoutSeconds <= 0) {
-        Await.result(analysisResult, Duration.Inf)
-      } else {
-        Await.result(analysisResult, Duration(coordinatorConfig.timeoutSeconds, SECONDS))
-      }
+      Await.result(analysisResult, coordinatorConfig.timeoutSeconds
+        .filter(_ > 0)
+        .map(Duration(_, SECONDS))
+        .getOrElse(Duration.Inf))
 
     (for {
       report <- optionT(lift(report))

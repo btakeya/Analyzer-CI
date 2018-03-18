@@ -1,5 +1,6 @@
 import sbt._
 import Keys._
+import sbtassembly.MergeStrategy
 
 lazy val commonSettings = Seq(
   organization := "com.kstreee.ci",
@@ -10,10 +11,12 @@ lazy val commonSettings = Seq(
   scalaSource in Compile := baseDirectory.value / "src/main/scala",
   scalaSource in Test := baseDirectory.value / "test/main/scala",
 
-  // Java options
-  javacOptions ++= Seq("-source", "1.8"),
-  javaSource in Compile := baseDirectory.value / "src/main/java",
-  javaSource in Test := baseDirectory.value / "test/main/java",
+  /*
+   * Java options
+   * javacOptions ++= Seq("-source", "1.8"),
+   * javaSource in Compile := baseDirectory.value / "src/main/java",
+   * javaSource in Test := baseDirectory.value / "test/main/java",
+   */
 
   // Resource options
   resourceDirectory in Compile := baseDirectory.value / "src/main/resources",
@@ -48,13 +51,18 @@ def jarOutputPathSetting(defaultPath: File, binaryName: String) = Seq(
     .getOrElse { defaultPath / binaryName }
 )
 
+val reverseConcat: MergeStrategy = new MergeStrategy {
+  val name = "reverseConcat"
+  def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] =
+    MergeStrategy.concat(tempDir, path, files.reverse)
+}
+
+
 lazy val common = (project in file("./app/common")).
   settings(commonSettings: _*).
   settings(jarOutputPathSetting(file("bin"), "common.jar"): _*).
   settings(
     name := "common",
-    // sbt-assembly settings
-    assemblyOutputPath in assembly := jarOutputPath.value
   )
 
 lazy val cli = (project in file("./app/cli")).
@@ -67,9 +75,33 @@ lazy val cli = (project in file("./app/cli")).
 
     // sbt-assembly settings
     mainClass in assembly := Some("com.kstreee.ci.app.CLIApp"),
+
+    assemblyMergeStrategy in assembly := {
+      case x if x.startsWith("META-INF") => MergeStrategy.discard // Bumf
+      case x if x.toLowerCase == "reference.conf" => reverseConcat // To resolve akka exceptions
+      case PathList("scala", "test", "resources", "application.conf") => MergeStrategy.discard
+      case other => MergeStrategy.defaultMergeStrategy(other)
+    },
     assemblyOutputPath in assembly := jarOutputPath.value
   ).dependsOn(common)
+
+/*
+lazy val common = (project in file("./app/common")).
+  settings(commonSettings: _*).
+  settings(jarOutputPathSetting(file("bin"), "common.jar"): _*).
+  settings(
+    name := "common",
+    // sbt-assembly settings
+    assemblyMergeStrategy in assembly := {
+      case x if x.startsWith("META-INF") => MergeStrategy.discard // Bumf
+      case x if x.toLowerCase == "reference.conf" => reverseConcat // To resolve akka exceptions
+      case PathList("scala", "test", "resources", "application.conf") => MergeStrategy.discard
+      case other => MergeStrategy.defaultMergeStrategy(other)
+    },
+    assemblyOutputPath in assembly := jarOutputPath.value
+  )
 
 // Explicit build command to provde common library to other build systems such as Gradle.
 lazy val buildCommonLibrary = taskKey[Unit]("A task to build a common library")
 buildCommonLibrary := (assembly in (common, assembly)).value
+*/

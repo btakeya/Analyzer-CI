@@ -46,7 +46,8 @@ class ReporterConfigLoadSpec(implicit ee: ExecutionEnv) extends Specification {
   "github issue reporter reads" should {
     "valid github issue reporter json" in {
       val name = ReporterConfigLoad.githubIssueName
-      val githubBaseUrl = "TEST_OWENR"
+      val githubBaseUrl = "TEST_BASE_URL"
+      val githubApiBaseUrl = "TEST_BASE_API_URL"
       val owner = "TEST_OWENR"
       val repo = "TEST_REPO"
       val number = 8
@@ -55,6 +56,7 @@ class ReporterConfigLoadSpec(implicit ee: ExecutionEnv) extends Specification {
                     |{
                     |  "name": "$name",
                     |  "github_base_url": "$githubBaseUrl",
+                    |  "github_api_base_url": "$githubApiBaseUrl",
                     |  "owner": "$owner",
                     |  "repo": "$repo",
                     |  "number": $number,
@@ -67,6 +69,7 @@ class ReporterConfigLoadSpec(implicit ee: ExecutionEnv) extends Specification {
         result must beSome[ReporterConfig]
         result.get must anInstanceOf[GitHubIssueReporterConfig]
         result.get.asInstanceOf[GitHubIssueReporterConfig].githubBaseUrl mustEqual githubBaseUrl
+        result.get.asInstanceOf[GitHubIssueReporterConfig].githubApiBaseUrl mustEqual githubApiBaseUrl
         result.get.asInstanceOf[GitHubIssueReporterConfig].owner mustEqual owner
         result.get.asInstanceOf[GitHubIssueReporterConfig].repo mustEqual repo
         result.get.asInstanceOf[GitHubIssueReporterConfig].number mustEqual number

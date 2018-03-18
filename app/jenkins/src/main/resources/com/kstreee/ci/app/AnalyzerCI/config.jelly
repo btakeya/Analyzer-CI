@@ -1,5 +1,11 @@
 <?jelly escape-by-default='true'?>
-<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+<j:jelly xmlns:j="jelly:core"
+        xmlns:st="jelly:stapler"
+         xmlns:d="jelly:define"
+         xmlns:l="/lib/layout"
+         xmlns:t="/lib/hudson"
+         xmlns:f="/lib/form"
+         xmlns:c="/lib/credentials">
   <!--
     This jelly script is used for per-project configuration.
     See global.jelly for a general discussion about jelly script.
@@ -10,6 +16,9 @@
     When submitted, it will be passed to the corresponding constructor parameter.
   -->
   <f:entry title="Github Base Url" field="githubBaseUrl">
+    <f:textbox />
+  </f:entry>
+  <f:entry title="Github Api Base Url" field="githubApiBaseUrl">
     <f:textbox />
   </f:entry>
   <f:entry title="Github Owner" field="githubOwner">

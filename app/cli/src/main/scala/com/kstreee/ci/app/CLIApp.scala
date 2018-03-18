@@ -12,10 +12,10 @@ import scala.concurrent.duration.Duration
 import scalaz.OptionT._
 import scalaz.std.scalaFuture._
 
-object CLIApp extends Analysis {
+object CLIApp {
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  private val logger = Logger[this.type]
+  private val logger: Logger = Logger[this.type]
 
   private def loadConfig(args: Array[String]): Future[Option[AnalysisConfig]] = {
     if (args == null || args.isEmpty) {
@@ -36,7 +36,7 @@ object CLIApp extends Analysis {
         // parse arguments & configurations
         analysisConfig <- optionT(loadConfig(args))
         // run an analysis and report a result
-        result <- optionT(analysis(analysisConfig))
+        result <- optionT(Analysis.analysis(analysisConfig))
       } yield result).run
     Await.result(res, Duration.Inf)
   }

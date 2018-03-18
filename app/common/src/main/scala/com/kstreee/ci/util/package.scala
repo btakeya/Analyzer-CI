@@ -79,6 +79,7 @@ package object util {
     val closer =
       x.map { o =>
         if (o.isEmpty) {
+          logger.info(s"Fire failed callback cause of Option is None.")
           f()
           o
         } else {
@@ -86,9 +87,19 @@ package object util {
         }
       }
     closer.failed.foreach { r =>
-      logger.error(s"Failed to handle future, $r")
+      logger.info(s"Fire failed callback cause of Future has been failed, $r")
       f()
     }
     closer
+  }
+
+  def callWhenFailed[T](x: Option[T])(implicit f: () => Unit): Option[T] = {
+    if (x.isEmpty) {
+      logger.info(s"Fire failed callback cause of Option is None.")
+      f()
+      x
+    } else {
+      x
+    }
   }
 }

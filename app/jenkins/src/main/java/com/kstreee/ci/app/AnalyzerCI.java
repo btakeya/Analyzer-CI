@@ -1,6 +1,6 @@
 package com.kstreee.ci.app;
 
-import com.kstreee.ci.analysis.Analysis;
+import com.kstreee.ci.analysis.Analysis$;
 import com.kstreee.ci.analysis.AnalysisConfig;
 import com.kstreee.ci.analyzer.AnalyzerConfig;
 import com.kstreee.ci.coordinator.CoordinatorConfig;
@@ -10,25 +10,26 @@ import com.kstreee.ci.sourcecode.loader.SourcecodeLoaderConfig;
 import com.kstreee.ci.sourcecode.loader.fs.FileSystemSourcecodeLoaderConfig;
 import com.kstreee.ci.storage.json.AnalyzerConfigLoad;
 import com.kstreee.ci.storage.json.CoordinatorConfigLoad;
-import hudson.Extension;
-import hudson.FilePath;
-import hudson.Launcher;
+import hudson.*;
 import hudson.model.AbstractProject;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 
+import java.net.URL;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 
 import hudson.util.FormValidation;
+import jenkins.model.Jenkins;
 import jenkins.tasks.SimpleBuildStep;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import play.api.libs.json.Json;
 import scala.NotImplementedError;
 import scala.Option;
@@ -40,9 +41,12 @@ import scala.concurrent.ExecutionContext$;
 import javax.annotation.Nonnull;
 
 // public class JenkinsApp extends Builder implements SimpleBuildStep, Analysis {
-public class AnalyzerCI extends Builder implements SimpleBuildStep, Analysis {
+public class AnalyzerCI extends Builder implements SimpleBuildStep {
+  private final Logger logger = LoggerFactory.getLogger(this.getClass());
+
   // Github issue
   private final String githubBaseUrl;
+  private final String githubApiBaseUrl;
   private final String githubOwner;
   private final String githubRepo;
   private final String githubIssueNumber;
@@ -56,6 +60,7 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep, Analysis {
   @DataBoundConstructor
   public AnalyzerCI(
           final String githubBaseUrl,
+          final String githubApiBaseUrl,
           final String githubOwner,
           final String githubRepo,
           final String githubIssueNumber,
@@ -65,6 +70,7 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep, Analysis {
           final Boolean runOnBackground
   ) {
     this.githubBaseUrl = githubBaseUrl;
+    this.githubApiBaseUrl = githubApiBaseUrl;
     this.githubOwner = githubOwner;
     this.githubRepo = githubRepo;
     this.githubIssueNumber = githubIssueNumber;
@@ -76,6 +82,10 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep, Analysis {
 
   public String getGithubBaseUrl() {
     return githubBaseUrl;
+  }
+
+  public String getGithubApiBaseUrl() {
+    return githubApiBaseUrl;
   }
 
   public String getGithubOwner() {
@@ -107,14 +117,12 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep, Analysis {
   }
 
   @Override
-  public void perform(@Nonnull Run<?,?> run,
-                      @Nonnull FilePath workspace,
-                      @Nonnull Launcher launcher,
-                      @Nonnull TaskListener listener) {
+  public synchronized void perform(
+          @Nonnull Run<?,?> run,
+          @Nonnull FilePath workspace,
+          @Nonnull Launcher launcher,
+          @Nonnull TaskListener listener) {
     try {
-      listener.getLogger().println("An analysis has been fired.");
-
-      // Validate
       DescriptorImpl checker = new DescriptorImpl();
       if (checker.doCheckGithubIssueNumber(githubIssueNumber).kind != FormValidation.Kind.OK) {
         listener.getLogger().println("Failed to handle github issue number");
@@ -127,38 +135,54 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep, Analysis {
       // Analyzer config
       Future<Option<AnalyzerConfig>>  analyzerConfigF = AnalyzerConfigLoad.load(
               Json.parse(analyzerConfig),
-              ExecutionContext$.MODULE$.fromExecutor(Executors.newFixedThreadPool(1)));
+              ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
 
       // Coordinator config
       Future<Option<CoordinatorConfig>> coordinatorConfigF = CoordinatorConfigLoad.load(
               Json.parse(coordinatorConfig),
-              ExecutionContext$.MODULE$.fromExecutor(Executors.newFixedThreadPool(1)));
+              ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
 
       // Sourcecode loader config
       SourcecodeLoaderConfig sourcecodeLoaderConfig = new FileSystemSourcecodeLoaderConfig(
               workspace.toURI().getPath(),
               OptionConverters.toScala(Optional.empty()));
+
       // Reporter config
       ReporterConfig reporterConfig = new GitHubIssueReporterConfig(
               githubBaseUrl,
+              githubApiBaseUrl,
               githubOwner,
               githubRepo,
               Integer.parseInt(githubIssueNumber),
-              githubToken);
+              githubToken,
+              OptionConverters.toScala(Optional.empty()),
+              OptionConverters.toScala(Optional.empty()));
 
-      if (runOnBackground) {
-        performAnalysis(listener, analyzerConfigF, coordinatorConfigF, sourcecodeLoaderConfig, reporterConfig);
-      } else {
-        performAnalysis(listener, analyzerConfigF, coordinatorConfigF, sourcecodeLoaderConfig, reporterConfig).wait();
+      // Perform analysis
+      CompletableFuture<Optional<Void>> performedAnalysis =
+              performAnalysis(listener, analyzerConfigF, coordinatorConfigF, sourcecodeLoaderConfig, reporterConfig)
+                      .toCompletableFuture()
+                      .thenApply(r -> {
+                        listener.getLogger().println("Analysis Done.");
+                        return r;
+                      })
+                      .exceptionally(e -> {
+                        listener.getLogger().println("Failed to execute, " + e.getMessage());
+                        e.printStackTrace(listener.getLogger());
+                        return Optional.empty();
+                      });
+      if (!runOnBackground) {
+        performedAnalysis.join();
       }
     } catch (Exception e) {
-      listener.getLogger().print(String.format("Failed to analyze, %s", e.getMessage()));
+      listener.getLogger().println(String.format("Failed to analyze, %s", e));
+      e.printStackTrace(listener.getLogger());
       listener.getLogger().flush();
     }
   }
 
   private CompletionStage<Optional<Void>> performAnalysis(
-          @Nonnull TaskListener listener,
+          @Nonnull final TaskListener listener,
           @Nonnull final Future<Option<AnalyzerConfig>> analyzerConfigF,
           @Nonnull final Future<Option<CoordinatorConfig>> coordinatorConfigF,
           @Nonnull final SourcecodeLoaderConfig sourcecodeLoaderConfig,
@@ -182,7 +206,10 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep, Analysis {
           AnalysisConfig analysisConfig = new AnalysisConfig(analyzerConfigO.get(), coordinatorConfigO.get(), sourcecodeLoaderConfig, reporterConfig);
           listener.getLogger().println(String.format("Start to analyze target program.\n%s\n", analysisConfig.toString()));
           return FutureConverters
-                  .toJava(analysis(analysisConfig, ExecutionContext$.MODULE$.fromExecutor(Executors.newFixedThreadPool(1))))
+                  .toJava(Analysis$.MODULE$.analysis(
+                          analysisConfig,
+                          Jenkins.getInstance().getPlugin("AnalyzerCI").getWrapper().classLoader,
+                          ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())))
                   .thenApply(o -> Optional.empty());
         }
       })
@@ -198,7 +225,7 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep, Analysis {
 
     @Override
     public String getDisplayName() {
-      return "analyzer github CI";
+      return "Analyzer-CI";
     }
 
     public FormValidation doCheckGithubIssueNumber(@QueryParameter("githubIssueNumber") final String githubIssueNumber) {
@@ -214,7 +241,7 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep, Analysis {
       try {
         return doCheckFO(AnalyzerConfigLoad.load(
                 Json.parse(analyzerConfig),
-                ExecutionContext$.MODULE$.fromExecutor(Executors.newFixedThreadPool(1))));
+                ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
       } catch (Exception e) {
         return FormValidation.error("Not a valid json.");
       }
@@ -224,7 +251,7 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep, Analysis {
       try {
         return doCheckFO(CoordinatorConfigLoad.load(
                 Json.parse(coordinatorConfig),
-                ExecutionContext$.MODULE$.fromExecutor(Executors.newFixedThreadPool(1))));
+                ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
       } catch (Exception e) {
         return FormValidation.error("Not a valid json.");
       }

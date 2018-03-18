@@ -11,6 +11,37 @@ import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
 
 public class AnalyzerCITest {
+  @Rule
+  public JenkinsRule jenkins = new JenkinsRule();
+
+  @Test
+  public void testConfigRoundtrip() throws Exception {
+    FreeStyleProject project = jenkins.createFreeStyleProject();
+    project.getBuildersList().add(new AnalyzerCI(
+            "" ,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            false
+    ));
+    project = jenkins.configRoundtrip(project);
+    jenkins.assertEqualDataBoundBeans(new AnalyzerCI(
+            "" ,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            false
+    ), project.getBuildersList().get(0));
+  }
+
     /*
     @Rule
     public JenkinsRule jenkins = new JenkinsRule();

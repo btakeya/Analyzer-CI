@@ -1,18 +1,16 @@
 package com.kstreee.ci.reporter.github.issue
 
-import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import com.kstreee.ci.analysis.{AnalysisReport, AnalysisReportItem}
+import com.kstreee.ci.common.ActorUtils
 import com.kstreee.ci.reporter.Reporter
 import com.kstreee.ci.util._
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json.Json
-import play.api.libs.ws.ahc._
 import play.api.libs.ws.DefaultBodyWritables._
+import play.api.libs.ws.ahc.StandaloneAhcWSClient
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.concurrent.duration.{Duration, SECONDS}
 import scala.util.Try
 import scalaz.OptionT._
 import scalaz.std.scalaFuture._
@@ -22,25 +20,16 @@ object GitHubIssueReporter extends Reporter {
 
   override type T = GitHubIssueReporterConfig
 
+  private val wsClient: Option[StandaloneAhcWSClient] = ActorUtils.getWSClient
+
   override def report(reporterConfig: T, analysisReport: AnalysisReport)(implicit ctx: ExecutionContext): Future[Option[Unit]] = {
-    implicit val system: ActorSystem = ActorSystem()
-    implicit val materializer: ActorMaterializer = ActorMaterializer()
-    val defaultConfig = AhcWSClientConfigFactory.forConfig()
-    val config = defaultConfig.copy(maxRequestRetry = 2, wsClientConfig = defaultConfig.wsClientConfig.copy(idleTimeout = Duration(10, SECONDS)))
-    implicit val wsClient: StandaloneAhcWSClient = StandaloneAhcWSClient(config)
-    implicit val close: () => Unit = { () =>
-      logger.info("Cleaning up WSClient resources...")
-      wsClient.close()
-      val termination = system.terminate()
-      termination.foreach(_ => logger.info("Cleaned a WS Client actor resource."))
-      termination.failed.foreach(e => logger.error(s"Failed to clean a WS Client actor resource, $e", e))
-      ()
-    }
+    implicit val close: () => Unit = { () => if (wsClient.isDefined) wsClient.get.close() else () }
 
     (for {
-      url <- optionT(callWhenFailed(getIssueCommentUrl(reporterConfig)))
-      comment <- optionT(callWhenFailed(getIssueComment(analysisReport)))
-      response <- optionT(callWhenFailed(lift(wsClient
+      client <- optionT(lift(wsClient))
+      url <- optionT(callWhenFailed(getIssueCommentUrl(reporterConfig, ctx)))
+      comment <- optionT(callWhenFailed(getIssueComment(analysisReport)(reporterConfig, ctx)))
+      response <- optionT(callWhenFailed(lift(client
         .url(url)
         .withHttpHeaders("Content-Type" -> "application/json")
         .withQueryStringParameters("access_token" -> reporterConfig.token)
@@ -50,13 +39,15 @@ object GitHubIssueReporter extends Reporter {
       close()
       logger.info(s"Got a response from GitHub, $reporterConfig\n$response")
       ()
-    }).run
+    }).run.recover {
+      case _ => None
+    }
   }
 
-  private def getIssueCommentUrl(reporterConfig: T)(implicit ctx: ExecutionContext): Future[Option[String]] = {
+  private def getIssueCommentUrl(implicit reporterConfig: T, ctx: ExecutionContext): Future[Option[String]] = {
     Future(
       info(
-        Try(s"${reporterConfig.githubBaseUrl}/repos/${reporterConfig.owner}/${reporterConfig.repo}/issues/${reporterConfig.number}/comments")
+        Try(s"${reporterConfig.githubApiBaseUrl}/repos/${reporterConfig.owner}/${reporterConfig.repo}/issues/${reporterConfig.number}/comments")
       ).toOption
     )
   }
@@ -66,17 +57,34 @@ object GitHubIssueReporter extends Reporter {
     else ""
   }
 
-  private def position(bug: AnalysisReportItem): String = {
-    s"at ${bug.path}:${bug.line}:${bug.column}"
+  private def position(bug: AnalysisReportItem)(implicit reporterConfig: T): String = {
+    val position = s"${bug.path}:${bug.line}:${bug.column}"
+    val linkBaseUrl = s"${reporterConfig.githubBaseUrl}/${reporterConfig.owner}/${reporterConfig.repo}/tree"
+    val linkPath = s"${bug.path}#L${bug.line}"
+    reporterConfig.commitSha
+      .map(commit => s"[$position]($linkBaseUrl/$commit/$linkPath)")
+      .orElse(reporterConfig.branch)
+      .map(branch => s"[$position]($linkBaseUrl/$branch/$linkPath)")
+      .getOrElse(s"$position")
   }
 
-  private def getIssueComment(analysisReport: AnalysisReport)(implicit ctx: ExecutionContext): Future[Option[GitHubIssueComment]] = {
+  private def getIssueComment(analysisReport: AnalysisReport)
+                             (implicit reporterConfig: T, ctx: ExecutionContext): Future[Option[GitHubIssueComment]] = {
     if (analysisReport == null || analysisReport.items == null || analysisReport.items.isEmpty) {
       Future(None)
     } else {
       val bugs = analysisReport.items.map { item =>
         if (item == null) ""
-        else s"- [ ] ${List(author(item), position(item), item.message).filter(_.trim == "").mkString(" ")}"
+        else {
+          s"""
+             |- [ ] ${List(author(item), position(item)).filter(_.trim != "").mkString(" ")}
+             |${if (item.message != null) item.message.trim else ""}
+          """.stripMargin
+        }
+      } map {
+        _.trim
+      } filter {
+        _.trim != ""
       } mkString "\n"
       Future(Some(GitHubIssueComment(s"An Analysis Result of ${analysisReport.analyzerConfig.name}.\n$bugs")))
     }

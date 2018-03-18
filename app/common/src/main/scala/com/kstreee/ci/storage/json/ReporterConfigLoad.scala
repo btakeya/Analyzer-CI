@@ -32,10 +32,13 @@ object ReporterConfigLoad extends ConfigLoad {
   private[json] val githubIssueName: String = "github_issue_reporter"
   private[json] implicit val githubIssueReads: Reads[ReporterConfig] = (
     (JsPath \ "github_base_url").read[String] and
+      (JsPath \ "github_api_base_url").read[String] and
       (JsPath \ "owner").read[String] and
       (JsPath \ "repo").read[String] and
       (JsPath \ "number").read[Int] and
-      (JsPath \ "token").read[String]
+      (JsPath \ "token").read[String] and
+      (JsPath \ "branch").readNullable[String] and
+      (JsPath \ "commitSha").readNullable[String]
     ) (GitHubIssueReporterConfig.apply _)
 
   private[json] def loadConfigByName(name: String, data: T): JsResult[U] = {

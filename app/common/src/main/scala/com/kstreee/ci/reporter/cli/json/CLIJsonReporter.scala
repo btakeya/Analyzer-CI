@@ -5,10 +5,8 @@ import com.kstreee.ci.reporter.Reporter
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object CLIJsonReporter extends Reporter {
-  override type T = CLIJsonReporterConfig
-
-  override def report(reporterConfig: T, analysisReport: AnalysisReport)(implicit ctx: ExecutionContext): Future[Option[Unit]] = {
+case class CLIJsonReporter(reporterConfig: CLIJsonReporterConfig) extends Reporter {
+  override def report(analysisReport: AnalysisReport)(implicit ctx: ExecutionContext): Future[Option[Unit]] = {
     println(
       s"""
          |===============analysis result===============

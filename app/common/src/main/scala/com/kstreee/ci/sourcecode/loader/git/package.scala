@@ -6,6 +6,7 @@ import java.nio.file.{Files, Path, Paths}
 import com.kstreee.ci.sourcecode.unloader.SourcecodeUnloaderConfig
 import com.kstreee.ci.sourcecode.unloader.fs.FileSystemSourcecodeUnloaderConfig
 import com.kstreee.ci.util._
+import com.typesafe.scalalogging.Logger
 
 import scala.sys.process._
 import scala.concurrent.{ExecutionContext, Future}
@@ -14,6 +15,8 @@ import scalaz.OptionT._
 import scalaz.std.scalaFuture._
 
 package object git {
+  private val logger: Logger = Logger[this.type]
+
   def gitCloneIfNotExists(gitLoaderConfig: GitLoaderConfig)(implicit ctx: ExecutionContext): Future[Option[Path]] = {
     implicit val basePath: Future[Option[Path]] = Future(gitLoaderConfig.basePath.map(Paths.get(_)))
     if (exists(gitLoaderConfig.sourcePath)) {
@@ -29,7 +32,8 @@ package object git {
   }
 
   def createTmpDirectoryIfNotExists(sourcePath: Option[String]): Option[String] = {
-    if (exists(sourcePath)) sourcePath else traceTry(Try(Files.createTempDirectory("analysis-ci").toString)).toOption
+    if (exists(sourcePath)) sourcePath
+    else asOption(Try(Files.createTempDirectory("analysis-ci").toString), (th: Throwable) => logger.error(s"Failed to create temp directory.", th))
   }
 
   def fileSystemUnloadIfNotExists(sourcePath: Option[String], basePath: String): Option[SourcecodeUnloaderConfig] = {

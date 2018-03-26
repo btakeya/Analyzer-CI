@@ -1,6 +1,6 @@
 package com.kstreee.ci.app;
 
-import com.kstreee.ci.analysis.Analysis$;
+import com.kstreee.ci.analysis.Analysis;
 import com.kstreee.ci.analysis.AnalysisConfig;
 import com.kstreee.ci.analyzer.AnalyzerConfig;
 import com.kstreee.ci.coordinator.CoordinatorConfig;
@@ -17,7 +17,6 @@ import hudson.model.TaskListener;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 
-import java.net.URL;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -205,11 +204,12 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
         } else {
           AnalysisConfig analysisConfig = new AnalysisConfig(analyzerConfigO.get(), coordinatorConfigO.get(), sourcecodeLoaderConfig, reporterConfig);
           listener.getLogger().println(String.format("Start to analyze target program.\n%s\n", analysisConfig.toString()));
+          Analysis analysis = new Analysis(
+                  analysisConfig,
+                  Jenkins.getInstance().getPlugin("AnalyzerCI").getWrapper().classLoader,
+                  ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
           return FutureConverters
-                  .toJava(Analysis$.MODULE$.analysis(
-                          analysisConfig,
-                          Jenkins.getInstance().getPlugin("AnalyzerCI").getWrapper().classLoader,
-                          ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())))
+                  .toJava(analysis.analysis())
                   .thenApply(o -> Optional.empty());
         }
       })

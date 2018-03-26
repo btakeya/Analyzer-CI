@@ -36,7 +36,7 @@ object CLIApp {
         // parse arguments & configurations
         analysisConfig <- optionT(loadConfig(args))
         // run an analysis and report a result
-        result <- optionT(Analysis.analysis(analysisConfig))
+        result <- optionT(Analysis(analysisConfig).analysis)
       } yield result).run
     Await.result(res, Duration.Inf)
   }

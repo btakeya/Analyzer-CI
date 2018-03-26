@@ -22,7 +22,7 @@ object ReporterConfigLoad extends ConfigLoad {
         name <- (JsPath \ "name").read[String].reads(data)
         config <- loadConfigByName(name, data)
       } yield config
-    Future(traceJsResult(config).asOpt)
+    Future(asOption(config, (e: JsError) => logger.error("Failed to parse config,", e)))
   }
 
   private[json] val cliPlainName: String = "cli_plain"

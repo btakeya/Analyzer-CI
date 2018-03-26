@@ -3,54 +3,36 @@ package com.kstreee.ci.coordinator.cli
 import java.io.File
 import java.nio.file.Path
 
-import com.kstreee.ci.analysis.AnalysisConfig
 import com.kstreee.ci.analyzer.Analyzer
 import com.kstreee.ci.coordinator.Coordinator
 import com.kstreee.ci.sourcecode.loader.SourcecodeLoader
 import com.kstreee.ci.sourcecode.unloader.SourcecodeUnloader
-import com.kstreee.ci.util._
 import com.typesafe.scalalogging.Logger
 
-import scala.concurrent.duration.{Duration, SECONDS}
 import sys.process._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import scalaz.OptionT._
 import scalaz.std.scalaFuture._
 
-object CLICoordinator extends Coordinator {
+case class CLICoordinator(config: CLICoordinatorConfig,
+                          analyzer: Analyzer,
+                          loader: SourcecodeLoader,
+                          unloader: Option[SourcecodeUnloader]) extends Coordinator {
   private val logger = Logger[this.type]
 
-  override type T = CLICoordinatorConfig
-
-  override def coordinate(coordinatorConfig: T)(implicit analysisConfig: AnalysisConfig, ctx: ExecutionContext): Future[Option[String]] = {
+  override def coordinate(implicit ctx: ExecutionContext): Future[Option[String]] = {
     val analysisResult =
-      (for {
-        sourcecodePath <- optionT(SourcecodeLoader.load)
-        cmd <- optionT(Analyzer.buildCmd)
+      for {
+        sourcecodePath <- optionT(loader.load)
+        cmd <- optionT(analyzer.buildCmd)
         analysisResult <- optionT(analysis(sourcecodePath, cmd))
-      } yield analysisResult).run
-
-    // Blocking until an analysis done based.
-    val report: Option[String] =
-      Await.result(analysisResult, coordinatorConfig.timeoutSeconds
-        .filter(_ > 0)
-        .map(Duration(_, SECONDS))
-        .getOrElse(Duration.Inf))
-
-    (for {
-      report <- optionT(lift(report))
-      _ <- optionT(SourcecodeUnloader.unload)
-    } yield report).run
+      } yield analysisResult
+    val future = analysisResult.run
+    future.foreach(_ => unloader.map(_.unload))
+    future
   }
 
-  private def analysis(sourcecodePath: Path, cmd: Seq[String])(implicit analysisConfig: AnalysisConfig, ctx: ExecutionContext): Future[Option[String]] = {
-    logger.info(
-      s"""
-         |----------analysis config-----------
-         |$analysisConfig
-         |------------------------------------
-       """.stripMargin
-    )
+  private def analysis(sourcecodePath: Path, cmd: Seq[String])(implicit ctx: ExecutionContext): Future[Option[String]] = {
     val stdout = new StringBuffer
     val stderr = new StringBuffer
     val process = Process(cmd, new File(sourcecodePath.toString))

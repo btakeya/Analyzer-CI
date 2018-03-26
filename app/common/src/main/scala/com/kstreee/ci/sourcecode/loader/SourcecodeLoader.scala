@@ -10,39 +10,26 @@ import com.kstreee.ci.util._
 import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
-import scalaz.OptionT._
-import scalaz.std.scalaFuture._
 
 trait SourcecodeLoader {
-  type T <: SourcecodeLoaderConfig
-  def load(sourcecodeConfig: T)(implicit ctx: ExecutionContext): Future[Option[Path]]
+  def load(implicit ctx: ExecutionContext): Future[Option[Path]]
 }
 
-object SourcecodeLoader extends SourcecodeLoader {
+object SourcecodeLoader {
   private val logger = Logger[this.type]
 
-  override type T = SourcecodeLoaderConfig
-
-  override def load(sourcecodeLoaderConfig: T)(implicit ctx: ExecutionContext): Future[Option[Path]] = {
-    logger.info(s"Loading source... $sourcecodeLoaderConfig")
-    sourcecodeLoaderConfig match {
-      case (c: FileSystemSourcecodeLoaderConfig) => FileSystemSourcecodeLoader.load(c)
-      case (c: GitCommitLoaderConfig) => GitCommitLoader.load(c)
-      case (c: GitBranchLoaderConfig) => GitBranchLoader.load(c)
+  def apply(config: SourcecodeLoaderConfig): Option[SourcecodeLoader] = {
+    config match {
+      case (c: FileSystemSourcecodeLoaderConfig) => Some(FileSystemSourcecodeLoader(c))
+      case (c: GitCommitLoaderConfig) => Some(GitCommitLoader(c))
+      case (c: GitBranchLoaderConfig) => Some(GitBranchLoader(c))
       case _ =>
-        logger.error(s"Not Implemented, $sourcecodeLoaderConfig")
-        Future(None)
+        logger.error(s"Not Implemented, $config")
+        None
     }
   }
 
-  def load(implicit analysisConfig: AnalysisConfig, ctx: ExecutionContext): Future[Option[Path]] = {
-    (for {
-      sourcecodeLoaderConfig <- optionT(lift(Try(analysisConfig.sourcecodeLoaderConfig)))
-      result <- optionT(load(sourcecodeLoaderConfig))
-    } yield {
-      logger.info(s"Loaded source : $result")
-      result
-    }).run
-  }
+  def apply(analysisConfig: AnalysisConfig): Option[SourcecodeLoader] =
+    asOption(analysisConfig.sourcecodeLoaderConfig, (th: Throwable) => logger.info(s"Failed to get sourcecode loader config.", th))
+      .flatMap(config => apply(config))
 }

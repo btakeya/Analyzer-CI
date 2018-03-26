@@ -7,10 +7,8 @@ import com.kstreee.ci.util._
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object FileSystemSourcecodeLoader extends SourcecodeLoader {
-  override type T = FileSystemSourcecodeLoaderConfig
-
-  override def load(sourcecodeloaderConfig: T)(implicit ctx: ExecutionContext): Future[Option[Path]] = {
-    lift(Paths.get(sourcecodeloaderConfig.sourcePath))
+case class FileSystemSourcecodeLoader(config: FileSystemSourcecodeLoaderConfig) extends SourcecodeLoader {
+  override def load(implicit ctx: ExecutionContext): Future[Option[Path]] = {
+    lift(Paths.get(config.sourcePath))
   }
 }

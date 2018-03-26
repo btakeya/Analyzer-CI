@@ -1,38 +1,39 @@
 package com.kstreee.ci.coordinator
 
-import com.kstreee.ci.analysis.AnalysisConfig
-import com.kstreee.ci.coordinator.cli.{CLICoordinator, CLICoordinatorConfig}
 import com.kstreee.ci.util._
+import com.kstreee.ci.analysis.AnalysisConfig
+import com.kstreee.ci.analyzer.Analyzer
+import com.kstreee.ci.coordinator.cli.{CLICoordinator, CLICoordinatorConfig}
+import com.kstreee.ci.sourcecode.loader.SourcecodeLoader
+import com.kstreee.ci.sourcecode.unloader.SourcecodeUnloader
 import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
-import scalaz.OptionT._
-import scalaz.std.scalaFuture._
 
 trait Coordinator {
-  type T <: CoordinatorConfig
-  def coordinate(coordinatorConfig: T)(implicit analysisConfig: AnalysisConfig, ctx: ExecutionContext): Future[Option[String]]
+  def coordinate(implicit ctx: ExecutionContext): Future[Option[String]]
 }
 
-object Coordinator extends Coordinator {
+object Coordinator {
   private val logger = Logger[this.type]
 
-  override type T = CoordinatorConfig
-
-  override def coordinate(coordinatorConfig: T)(implicit analysisConfig: AnalysisConfig, executionContext: ExecutionContext): Future[Option[String]] = {
-    coordinatorConfig match {
-      case (c: CLICoordinatorConfig) => CLICoordinator.coordinate(c)
-      case _ =>
-        logger.error(s"Not Implemented, $coordinatorConfig")
-        Future(None)
+  def apply(analysisConfig: AnalysisConfig): Option[Coordinator] = {
+    for {
+      analyzer <- tap(Analyzer(analysisConfig), logger.error(s"Failed to get analyzer."))
+      loader <- tap(SourcecodeLoader(analysisConfig), logger.error(s"Failed to get sourcecode loader."))
+      config <- asOption(analysisConfig.coordinatorConfig, (th: Throwable) => logger.info(s"Failed to get coordinator config.", th))
+      coordinator <- apply(config, analyzer, loader, SourcecodeUnloader(analysisConfig))
+    } yield {
+      coordinator
     }
   }
 
-  def coordinate(implicit analysisConfig: AnalysisConfig, ctx: ExecutionContext): Future[Option[String]] = {
-    (for {
-      coordinateConfig <- optionT(lift(Try(analysisConfig.coordinatorConfig)))
-      result <- optionT(coordinate(coordinateConfig))
-    } yield result).run
+  def apply(config: CoordinatorConfig, analyzer: Analyzer, loader: SourcecodeLoader, unloader: Option[SourcecodeUnloader]): Option[Coordinator] = {
+    config match {
+      case (c: CLICoordinatorConfig) => Some(CLICoordinator(c, analyzer, loader, unloader))
+      case _ =>
+        logger.error(s"Not Implemented, $config")
+        None
+    }
   }
 }

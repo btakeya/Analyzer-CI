@@ -11,17 +11,17 @@ import scalaz.std.scalaFuture._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.sys.process._
 
-object GitCommitLoader extends GitLoader {
-  override type T = GitCommitLoaderConfig
-
-  override def checkout(sourcecodeLoaderConfig: T)(implicit ctx: ExecutionContext): Future[Option[Path]] = {
-    implicit val ret: Future[Option[Path]] = Future(sourcecodeLoaderConfig.basePath.map(Paths.get(_)))
+case class GitCommitLoader(config: GitCommitLoaderConfig) extends GitLoader(config) {
+  override def checkout(implicit ctx: ExecutionContext): Future[Option[Path]] = {
+    implicit val ret: Future[Option[Path]] = Future(config.basePath.map(Paths.get(_)))
     val fetch = Seq("git", "fetch", "--all")
-    val checkout = Seq("git", "checkout", s"${sourcecodeLoaderConfig.commitHash}")
-    (for {
-      path <- optionT(lift(sourcecodeLoaderConfig.basePath))
-      _ <- optionT(liftFailedWhenZero(Process(fetch, new File(path)).!))
-      r <- optionT(liftFailedWhenZero(Process(checkout, new File(path)).!))
-    } yield r).run
+    val checkout = Seq("git", "checkout", s"${config.commitHash}")
+    val load =
+      for {
+        path <- optionT(lift(config.basePath))
+        _ <- optionT(liftFailedWhenZero(Process(fetch, new File(path)).!))
+        r <- optionT(liftFailedWhenZero(Process(checkout, new File(path)).!))
+      } yield r
+    load.run
   }
 }

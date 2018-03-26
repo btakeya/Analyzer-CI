@@ -39,13 +39,15 @@ object AnalysisConfigLoad extends ConfigLoad {
       if (reporterConfigDefault.isDefined) lift(reporterConfigDefault)
       else optionT(lift((JsPath \ "reporter").asSingleJsResult(data))).flatMap(configData => optionT(ReporterConfigLoad.load(configData))).run
 
-    (for {
-      analyzerConfig <- optionT(analyzerConfig)
-      coordinatorConfig <- optionT(coordinatorConfig)
-      sourcecodeLoaderConfig <- optionT(sourcecodeLoaderConfig)
-      reporterConfig <- optionT(reporterConfig)
-    } yield {
-      AnalysisConfig(analyzerConfig, coordinatorConfig, sourcecodeLoaderConfig, reporterConfig)
-    }).run
+    val analysisConfig =
+      for {
+        analyzerConfig <- optionT(analyzerConfig)
+        coordinatorConfig <- optionT(coordinatorConfig)
+        sourcecodeLoaderConfig <- optionT(sourcecodeLoaderConfig)
+        reporterConfig <- optionT(reporterConfig)
+      } yield {
+        AnalysisConfig(analyzerConfig, coordinatorConfig, sourcecodeLoaderConfig, reporterConfig)
+      }
+    analysisConfig.run
   }
 }

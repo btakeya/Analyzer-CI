@@ -31,13 +31,13 @@ object CLIApp {
   }
 
   def main(args: Array[String]): Unit = {
-    val res =
-      (for {
+    val analysis =
+      for {
         // parse arguments & configurations
         analysisConfig <- optionT(loadConfig(args))
         // run an analysis and report a result
-        result <- optionT(Analysis.analysis(analysisConfig))
-      } yield result).run
-    Await.result(res, Duration.Inf)
+        result <- optionT(Analysis(analysisConfig).analysis)
+      } yield result
+    Await.result(analysis.run, Duration.Inf)
   }
 }

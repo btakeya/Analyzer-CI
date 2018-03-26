@@ -1,11 +1,11 @@
 package com.kstreee.ci
 
 import com.typesafe.scalalogging.Logger
-import play.api.libs.json.{JsError, JsResult}
+import play.api.libs.json.{JsError, JsPath, JsResult, JsonValidationError}
 import play.api.libs.ws.ahc._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
 
 package object util {
   private val logger = Logger("util")
@@ -20,7 +20,7 @@ package object util {
   }
 
   def lift[T](t: Try[T])(implicit ctx: ExecutionContext): Future[Option[T]] = {
-    Future(traceTry(t).toOption)
+    Future(asOption(t, (th: Throwable) => logger.info(s"Failed to lift 'Try' has been failed.", th)))
   }
 
   def lift[T](opt: Option[T])(implicit ctx: ExecutionContext): Future[Option[T]] = {
@@ -32,7 +32,7 @@ package object util {
   }
 
   def lift[T](r: JsResult[T])(implicit ctx: ExecutionContext): Future[Option[T]] = {
-    Future(traceJsResult(r).asOpt)
+    Future(asOption(r, (e: JsError) => logger.error(s"Failed to lisft, JsResult haven't been succeeded.", e)))
   }
 
   def liftFailedWhenZero[T](exitValue: Int)(implicit t: Future[Option[T]], ctx: ExecutionContext): Future[Option[T]] = {
@@ -52,54 +52,60 @@ package object util {
     d
   }
 
-  def trace[T](d: T): T = {
-    logger.trace(s"Tracing : $d")
-    d
+  def trace[T](x: T, logging: => Unit): T = {
+    logging
+    x
   }
 
-  def traceTry[T](x: Try[T]): Try[T] = {
+  def tap[T](x: Option[T], f: => Unit): Option[T] = {
+    if (x.isEmpty) f
+    x
+  }
+
+  def tap[T](x: Try[T], f: Throwable => Unit): Try[T] = {
+    if (x.isFailure) x.failed.foreach(f)
+    x
+  }
+
+  def tap[T](x: JsResult[T], f: JsError => Unit): JsResult[T] = {
     x match {
-      case Failure(e) =>
-        logger.error(s"Failed to execute", e)
-        x
-      case _ => x
+      case e: JsError => f(e)
+      case _ => ()
     }
+    x
   }
 
-  def traceJsResult[T](x: JsResult[T]): JsResult[T] = {
-    x match {
-      case JsError(e) =>
-        logger.error(s"Failed to execute", e)
-        x
-      case _ => x
-    }
-  }
-
-  def callWhenFailed[T](x: Future[Option[T]])(implicit f: () => Unit, ctx: ExecutionContext): Future[Option[T]] = {
-    val closer =
-      x.map { o =>
-        if (o.isEmpty) {
-          logger.info(s"Fire failed callback cause of Option is None.")
-          f()
-          o
+  def asOption[T](x: => T, f: Throwable => Unit): Option[T] = {
+    Try(x) match {
+      case Success(v) =>
+        if (v == null) {
+          f(new Exception("value can't be null."))
+          None
         } else {
-          o
+          Some(v)
         }
+      case Failure(th) => {
+        f(th)
+        None
       }
-    closer.failed.foreach { r =>
-      logger.info(s"Fire failed callback cause of Future has been failed, $r")
-      f()
     }
-    closer
   }
 
-  def callWhenFailed[T](x: Option[T])(implicit f: () => Unit): Option[T] = {
-    if (x.isEmpty) {
-      logger.info(s"Fire failed callback cause of Option is None.")
-      f()
-      x
-    } else {
-      x
+  def asOption[T](x: => T, cond: T => Boolean, f: Throwable => Unit): Option[T] = {
+    asOption(x, f).flatMap { v =>
+      if (cond(v)) Some(v)
+      else {
+        f(new Exception(s"Failed to pass condition, $v"))
+        None
+      }
     }
+  }
+
+  def asOption[T](x: Try[T], f: Throwable => Unit): Option[T] = {
+    tap(x, f).toOption
+  }
+
+  def asOption[T](x: JsResult[T], f: JsError => Unit): Option[T] = {
+    tap(x, f).asOpt
   }
 }

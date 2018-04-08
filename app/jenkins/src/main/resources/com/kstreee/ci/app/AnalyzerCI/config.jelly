@@ -15,24 +15,6 @@
     Creates a text field that shows the value of the "name" property.
     When submitted, it will be passed to the corresponding constructor parameter.
   -->
-  <f:entry title="Github Base Url" field="githubBaseUrl">
-    <f:textbox />
-  </f:entry>
-  <f:entry title="Github Api Base Url" field="githubApiBaseUrl">
-    <f:textbox />
-  </f:entry>
-  <f:entry title="Github Owner" field="githubOwner">
-    <f:textbox />
-  </f:entry>
-  <f:entry title="Github Repo" field="githubRepo">
-    <f:textbox />
-  </f:entry>
-  <f:entry title="Github Issue Number" field="githubIssueNumber">
-    <f:textbox />
-  </f:entry>
-  <f:entry title="Github Token" field="githubToken">
-    <f:textbox />
-  </f:entry>
   <f:entry title="Run on background" field="runOnBackground">
     <f:checkbox/>
   </f:entry>
@@ -40,6 +22,9 @@
     <f:textarea />
   </f:entry>
   <f:entry title="Coordinator config" field="coordinatorConfig">
+    <f:textarea />
+  </f:entry>
+  <f:entry title="Reporter config" field="reporterConfig">
     <f:textarea />
   </f:entry>
 </j:jelly>

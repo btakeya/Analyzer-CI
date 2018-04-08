@@ -1,5 +1,5 @@
 import sbt._
-import Keys._
+import sbt.Keys._
 import sbtassembly.MergeStrategy
 
 lazy val commonSettings = Seq(
@@ -27,6 +27,13 @@ lazy val commonSettings = Seq(
   resolvers += "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases",
   resolvers += DefaultMavenRepository,
 
+  // Scala libraries
+  libraryDependencies += "org.scala-lang" % "scala-reflect" % "2.12.4",
+  // Joda-time libraries
+  libraryDependencies += "joda-time" % "joda-time" % "2.9.9",
+  libraryDependencies += "org.joda" % "joda-convert" % "1.9.2",
+  // YAML libraries
+  libraryDependencies += "net.jcazevedo" %% "moultingyaml" % "0.4.0",
   // Logging libraries
   libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3",
   libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0",

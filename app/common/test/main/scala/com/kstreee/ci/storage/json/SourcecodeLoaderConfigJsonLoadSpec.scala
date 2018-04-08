@@ -8,10 +8,10 @@ import org.specs2.concurrent.ExecutionEnv
 import org.specs2.mutable.Specification
 import play.api.libs.json.Json
 
-class SourcecodeLoaderConfigLoadSpec(implicit ee: ExecutionEnv) extends Specification {
-  "file system reads" should  {
+class SourcecodeLoaderConfigJsonLoadSpec(implicit ee: ExecutionEnv) extends Specification {
+  "file system reads" should {
     "valid file system json" in {
-      val name = SourcecodeLoaderConfigLoad.fileSystemName
+      val name = SourcecodeLoaderConfigJsonLoad.fileSystemName
       val sourcePath = "TEST_SOURCE_PATH"
       val tmpPath = "TEST_TMP_PATH"
       val json = s"""
@@ -21,7 +21,7 @@ class SourcecodeLoaderConfigLoadSpec(implicit ee: ExecutionEnv) extends Specific
                     |}
       """.stripMargin
       (for {
-        result <- SourcecodeLoaderConfigLoad.load(Json.parse(json))
+        result <- SourcecodeLoaderConfigJsonLoad.load(Json.parse(json))
       } yield {
         result must beSome[SourcecodeLoaderConfig]
         result.get must anInstanceOf[FileSystemSourcecodeLoaderConfig]
@@ -30,9 +30,9 @@ class SourcecodeLoaderConfigLoadSpec(implicit ee: ExecutionEnv) extends Specific
     }
   }
 
-  "git branch reads" should  {
+  "git branch reads" should {
     "valid git branch json" in {
-      val name = SourcecodeLoaderConfigLoad.gitBranchName
+      val name = SourcecodeLoaderConfigJsonLoad.gitBranchName
       val uri = "TES_URI"
       val sourcePath = "TEST_SOURCE_PATH"
       val tmpPath = "TEST_TMP_PATH"
@@ -47,7 +47,7 @@ class SourcecodeLoaderConfigLoadSpec(implicit ee: ExecutionEnv) extends Specific
                     |}
       """.stripMargin
       (for  {
-        result <- SourcecodeLoaderConfigLoad.load(Json.parse(json))
+        result <- SourcecodeLoaderConfigJsonLoad.load(Json.parse(json))
       } yield {
         result must beSome[SourcecodeLoaderConfig]
         result.get must anInstanceOf[GitBranchLoaderConfig]
@@ -59,9 +59,9 @@ class SourcecodeLoaderConfigLoadSpec(implicit ee: ExecutionEnv) extends Specific
     }
   }
 
-  "git commit reads" should  {
+  "git commit reads" should {
     "valid git commit json" in {
-      val name = SourcecodeLoaderConfigLoad.gitCommitName
+      val name = SourcecodeLoaderConfigJsonLoad.gitCommitName
       val uri = "TES_URI"
       val tmpPath = "TEST_TMP_PATH"
       val commitHash = "TEST_COMMIT_HASH"
@@ -74,7 +74,7 @@ class SourcecodeLoaderConfigLoadSpec(implicit ee: ExecutionEnv) extends Specific
                     |}
       """.stripMargin
       (for {
-        result <- SourcecodeLoaderConfigLoad.load(Json.parse(json))
+        result <- SourcecodeLoaderConfigJsonLoad.load(Json.parse(json))
       } yield {
         result must beSome[SourcecodeLoaderConfig]
         result.get must anInstanceOf[GitCommitLoaderConfig]

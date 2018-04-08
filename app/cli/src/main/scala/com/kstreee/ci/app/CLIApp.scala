@@ -3,7 +3,7 @@ package com.kstreee.ci.app
 import java.nio.file.{Files, Paths}
 
 import com.kstreee.ci.analysis.{Analysis, AnalysisConfig}
-import com.kstreee.ci.storage.json.AnalysisConfigLoad
+import com.kstreee.ci.storage.json.AnalysisConfigJsonLoad
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json.Json
 
@@ -26,7 +26,7 @@ object CLIApp {
       Future(None)
     } else {
       val optionInputStream = Files.newInputStream(Paths.get(args(0)))
-      AnalysisConfigLoad.load(Json.parse(optionInputStream))
+      AnalysisConfigJsonLoad.load(Json.parse(optionInputStream))
     }
   }
 

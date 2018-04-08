@@ -6,6 +6,7 @@ import com.kstreee.ci.reporter.Reporter
 import com.kstreee.ci.util._
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json.Json
+import play.api.libs.ws.DefaultBodyWritables._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -27,8 +28,7 @@ case class GitHubIssueReporter(config: GitHubIssueReporterConfig, ahcActorSystem
           .url(url)
           .withHttpHeaders("Content-Type" -> "application/json")
           .withQueryStringParameters("access_token" -> config.token)
-          .post(Json.stringify(Json.toJson(comment)))
-        ))
+          .post(Json.stringify(Json.toJson(comment)))))
       } yield {
         logger.info(s"Got a response from GitHub, $config\n$response")
         ()

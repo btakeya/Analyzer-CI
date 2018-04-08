@@ -5,11 +5,9 @@ import com.kstreee.ci.analysis.AnalysisConfig;
 import com.kstreee.ci.analyzer.AnalyzerConfig;
 import com.kstreee.ci.coordinator.CoordinatorConfig;
 import com.kstreee.ci.reporter.ReporterConfig;
-import com.kstreee.ci.reporter.github.issue.GitHubIssueReporterConfig;
 import com.kstreee.ci.sourcecode.loader.SourcecodeLoaderConfig;
 import com.kstreee.ci.sourcecode.loader.fs.FileSystemSourcecodeLoaderConfig;
-import com.kstreee.ci.storage.json.AnalyzerConfigLoad;
-import com.kstreee.ci.storage.json.CoordinatorConfigLoad;
+import com.kstreee.ci.storage.yaml.*;
 import hudson.*;
 import hudson.model.AbstractProject;
 import hudson.model.Run;
@@ -29,7 +27,6 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import play.api.libs.json.Json;
 import scala.NotImplementedError;
 import scala.Option;
 import scala.concurrent.Future;
@@ -43,64 +40,24 @@ import javax.annotation.Nonnull;
 public class AnalyzerCI extends Builder implements SimpleBuildStep {
   private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-  // Github issue
-  private final String githubBaseUrl;
-  private final String githubApiBaseUrl;
-  private final String githubOwner;
-  private final String githubRepo;
-  private final String githubIssueNumber;
-  private final String githubToken;
   // Configs
   private final String analyzerConfig;
   private final String coordinatorConfig;
+  private final String reporterConfig;
   // Other options
   private final Boolean runOnBackground;
 
   @DataBoundConstructor
   public AnalyzerCI(
-          final String githubBaseUrl,
-          final String githubApiBaseUrl,
-          final String githubOwner,
-          final String githubRepo,
-          final String githubIssueNumber,
-          final String githubToken,
           final String analyzerConfig,
           final String coordinatorConfig,
+          final String reporterConfig,
           final Boolean runOnBackground
   ) {
-    this.githubBaseUrl = githubBaseUrl;
-    this.githubApiBaseUrl = githubApiBaseUrl;
-    this.githubOwner = githubOwner;
-    this.githubRepo = githubRepo;
-    this.githubIssueNumber = githubIssueNumber;
-    this.githubToken = githubToken;
     this.analyzerConfig = analyzerConfig;
     this.coordinatorConfig = coordinatorConfig;
+    this.reporterConfig = reporterConfig;
     this.runOnBackground = runOnBackground;
-  }
-
-  public String getGithubBaseUrl() {
-    return githubBaseUrl;
-  }
-
-  public String getGithubApiBaseUrl() {
-    return githubApiBaseUrl;
-  }
-
-  public String getGithubOwner() {
-    return githubOwner;
-  }
-
-  public String getGithubRepo() {
-    return githubRepo;
-  }
-
-  public String getGithubIssueNumber() {
-    return githubIssueNumber;
-  }
-
-  public String getGithubToken() {
-    return githubToken;
   }
 
   public String getAnalyzerConfig() {
@@ -109,6 +66,10 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
 
   public String getCoordinatorConfig() {
     return coordinatorConfig;
+  }
+
+  public String getReporterConfig() {
+    return reporterConfig;
   }
 
   public Boolean getRunOnBackground() {
@@ -123,22 +84,23 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
           @Nonnull TaskListener listener) {
     try {
       DescriptorImpl checker = new DescriptorImpl();
-      if (checker.doCheckGithubIssueNumber(githubIssueNumber).kind != FormValidation.Kind.OK) {
-        listener.getLogger().println("Failed to handle github issue number");
-      } else if (checker.doCheckAnalyzerConfig(analyzerConfig).kind != FormValidation.Kind.OK) {
+      if (checker.doCheckAnalyzerConfig(analyzerConfig).kind != FormValidation.Kind.OK) {
         listener.getLogger().println("Failed to handle analyzer config");
-      } else if (checker.doCheckCoordinatorConfig(coordinatorConfig).kind != FormValidation.Kind.OK) {
+      }
+      if (checker.doCheckCoordinatorConfig(coordinatorConfig).kind != FormValidation.Kind.OK) {
+        listener.getLogger().println("Failed to handle coordinator config");
+      }
+      if (checker.doCheckReporterConfig(reporterConfig).kind != FormValidation.Kind.OK) {
         listener.getLogger().println("Failed to handle coordinator config");
       }
 
       // Analyzer config
-      Future<Option<AnalyzerConfig>>  analyzerConfigF = AnalyzerConfigLoad.load(
-              Json.parse(analyzerConfig),
-              ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
+      Future<Option<AnalyzerConfig>> analyzerConfigF =
+              AnalyzerConfigYamlLoad.loadByString(analyzerConfig, ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
 
       // Coordinator config
-      Future<Option<CoordinatorConfig>> coordinatorConfigF = CoordinatorConfigLoad.load(
-              Json.parse(coordinatorConfig),
+      Future<Option<CoordinatorConfig>> coordinatorConfigF = CoordinatorConfigYamlLoad.loadByString(
+              coordinatorConfig,
               ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
 
       // Sourcecode loader config
@@ -147,19 +109,13 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
               OptionConverters.toScala(Optional.empty()));
 
       // Reporter config
-      ReporterConfig reporterConfig = new GitHubIssueReporterConfig(
-              githubBaseUrl,
-              githubApiBaseUrl,
-              githubOwner,
-              githubRepo,
-              Integer.parseInt(githubIssueNumber),
-              githubToken,
-              OptionConverters.toScala(Optional.empty()),
-              OptionConverters.toScala(Optional.empty()));
+      Future<Option<ReporterConfig>> reporterConfigF = ReporterConfigYamlLoad.loadByString(
+              reporterConfig,
+              ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
 
       // Perform analysis
       CompletableFuture<Optional<Void>> performedAnalysis =
-              performAnalysis(listener, analyzerConfigF, coordinatorConfigF, sourcecodeLoaderConfig, reporterConfig)
+              performAnalysis(listener, analyzerConfigF, coordinatorConfigF, sourcecodeLoaderConfig, reporterConfigF)
                       .toCompletableFuture()
                       .thenApply(r -> {
                         listener.getLogger().println("Analysis Done.");
@@ -185,35 +141,39 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
           @Nonnull final Future<Option<AnalyzerConfig>> analyzerConfigF,
           @Nonnull final Future<Option<CoordinatorConfig>> coordinatorConfigF,
           @Nonnull final SourcecodeLoaderConfig sourcecodeLoaderConfig,
-          @Nonnull final ReporterConfig reporterConfig) {
+          @Nonnull final Future<Option<ReporterConfig>> reporterConfigF) {
     CompletionStage<Optional<AnalyzerConfig>> analyzerConfigC = FutureConverters
             .toJava(analyzerConfigF)
             .thenApply(OptionConverters::toJava);
     CompletionStage<Optional<CoordinatorConfig>> coordinatorConfigC = FutureConverters
             .toJava(coordinatorConfigF)
             .thenApply(OptionConverters::toJava);
+    CompletionStage<Optional<ReporterConfig>> reporterConfigC = FutureConverters
+            .toJava(reporterConfigF)
+            .thenApply(OptionConverters::toJava);
 
-    return analyzerConfigC.thenCompose(analyzerConfigO ->
-      coordinatorConfigC.thenCompose(coordinatorConfigO -> {
-        if (!analyzerConfigO.isPresent()) {
-          listener.getLogger().println("Failed to load analyzer config.");
-          return CompletableFuture.completedFuture(Optional.empty());
-        } else if (!coordinatorConfigO.isPresent()) {
-          listener.getLogger().println("Failed to load coordinator config.");
-          return CompletableFuture.completedFuture(Optional.empty());
-        } else {
-          AnalysisConfig analysisConfig = new AnalysisConfig(analyzerConfigO.get(), coordinatorConfigO.get(), sourcecodeLoaderConfig, reporterConfig);
-          listener.getLogger().println(String.format("Start to analyze target program.\n%s\n", analysisConfig.toString()));
-          Analysis analysis = new Analysis(
-                  analysisConfig,
-                  Jenkins.getInstance().getPlugin("AnalyzerCI").getWrapper().classLoader,
-                  ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
-          return FutureConverters
-                  .toJava(analysis.analysis())
-                  .thenApply(o -> Optional.empty());
-        }
-      })
-    );
+    return analyzerConfigC.thenCompose(analyzerConfigO -> coordinatorConfigC.thenCompose(coordinatorConfigO -> reporterConfigC.thenCompose(reporterCOnfigO -> {
+      if (!analyzerConfigO.isPresent()) {
+        listener.getLogger().println("Failed to load analyzer config.");
+        return CompletableFuture.completedFuture(Optional.empty());
+      } else if (!coordinatorConfigO.isPresent()) {
+        listener.getLogger().println("Failed to load coordinator config.");
+        return CompletableFuture.completedFuture(Optional.empty());
+      } else if (!reporterCOnfigO.isPresent()) {
+        listener.getLogger().println("Failed to load reporter config.");
+        return CompletableFuture.completedFuture(Optional.empty());
+      } else {
+        AnalysisConfig analysisConfig = new AnalysisConfig(analyzerConfigO.get(), coordinatorConfigO.get(), sourcecodeLoaderConfig, reporterCOnfigO.get());
+        listener.getLogger().println(String.format("Start to analyze target program.\n%s\n", analysisConfig.toString()));
+        Analysis analysis = new Analysis(
+                analysisConfig,
+                Jenkins.getInstance().getPlugin("AnalyzerCI").getWrapper().classLoader,
+                ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
+        return FutureConverters
+                .toJava(analysis.analysis())
+                .thenApply(o -> Optional.empty());
+      }
+    })));
   }
 
   @Extension
@@ -228,32 +188,33 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
       return "Analyzer-CI";
     }
 
-    public FormValidation doCheckGithubIssueNumber(@QueryParameter("githubIssueNumber") final String githubIssueNumber) {
-      try {
-        Integer.parseInt(githubIssueNumber);
-        return FormValidation.ok();
-      } catch (NumberFormatException e) {
-        return FormValidation.error("Not a number.");
-      }
-    }
-
     public FormValidation doCheckAnalyzerConfig(@QueryParameter("analyzerConfig") final String analyzerConfig) {
-      try {
-        return doCheckFO(AnalyzerConfigLoad.load(
-                Json.parse(analyzerConfig),
+      if (!ReporterConfigYamlLoad.isValidYaml(analyzerConfig)) {
+        return FormValidation.error("Not a valid Yaml.");
+      } else {
+        return doCheckFO(AnalyzerConfigYamlLoad.loadByString(
+                analyzerConfig,
                 ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
-      } catch (Exception e) {
-        return FormValidation.error("Not a valid json.");
       }
     }
 
     public FormValidation doCheckCoordinatorConfig(@QueryParameter("coordinatorConfig") final String coordinatorConfig) {
-      try {
-        return doCheckFO(CoordinatorConfigLoad.load(
-                Json.parse(coordinatorConfig),
+      if (!ReporterConfigYamlLoad.isValidYaml(coordinatorConfig)) {
+        return FormValidation.error("Not a valid Yaml.");
+      } else {
+        return doCheckFO(CoordinatorConfigYamlLoad.loadByString(
+                coordinatorConfig,
                 ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
-      } catch (Exception e) {
-        return FormValidation.error("Not a valid json.");
+      }
+    }
+
+    public FormValidation doCheckReporterConfig(@QueryParameter("reporterConfig") final String reporterConfig) {
+      if (!ReporterConfigYamlLoad.isValidYaml(reporterConfig)) {
+        return FormValidation.error("Not a valid Yaml.");
+      } else {
+        return doCheckFO(ReporterConfigYamlLoad.loadByString(
+                reporterConfig,
+                ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
       }
     }
 

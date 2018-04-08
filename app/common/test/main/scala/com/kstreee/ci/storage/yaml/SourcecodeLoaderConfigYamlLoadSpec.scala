@@ -1,4 +1,4 @@
-package com.kstreee.ci.storage.json
+package com.kstreee.ci.storage.yaml
 
 import com.kstreee.ci.sourcecode.loader.SourcecodeLoaderConfig
 import com.kstreee.ci.sourcecode.loader.fs.FileSystemSourcecodeLoaderConfig
@@ -6,22 +6,19 @@ import com.kstreee.ci.sourcecode.loader.git.branch.GitBranchLoaderConfig
 import com.kstreee.ci.sourcecode.loader.git.commit.GitCommitLoaderConfig
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.mutable.Specification
-import play.api.libs.json.Json
+import net.jcazevedo.moultingyaml._
 
-class SourcecodeLoaderConfigLoadSpec(implicit ee: ExecutionEnv) extends Specification {
-  "file system reads" should  {
-    "valid file system json" in {
-      val name = SourcecodeLoaderConfigLoad.fileSystemName
+class SourcecodeLoaderConfigYamlLoadSpec(implicit ee: ExecutionEnv) extends Specification {
+  "file system reads" should {
+    "valid file system yaml" in {
+      val name = SourcecodeLoaderConfigYamlLoad.fileSystemName
       val sourcePath = "TEST_SOURCE_PATH"
-      val tmpPath = "TEST_TMP_PATH"
-      val json = s"""
-                    |{
-                    |  "name": "$name",
-                    |  "source_path": "$sourcePath"
-                    |}
+      val yaml = s"""
+                    |name: $name
+                    |source_path: $sourcePath
       """.stripMargin
       (for {
-        result <- SourcecodeLoaderConfigLoad.load(Json.parse(json))
+        result <- SourcecodeLoaderConfigYamlLoad.load(yaml.parseYaml)
       } yield {
         result must beSome[SourcecodeLoaderConfig]
         result.get must anInstanceOf[FileSystemSourcecodeLoaderConfig]
@@ -30,24 +27,22 @@ class SourcecodeLoaderConfigLoadSpec(implicit ee: ExecutionEnv) extends Specific
     }
   }
 
-  "git branch reads" should  {
-    "valid git branch json" in {
-      val name = SourcecodeLoaderConfigLoad.gitBranchName
+  "git branch reads" should {
+    "valid git branch yaml" in {
+      val name = SourcecodeLoaderConfigYamlLoad.gitBranchName
       val uri = "TES_URI"
       val sourcePath = "TEST_SOURCE_PATH"
       val tmpPath = "TEST_TMP_PATH"
       val branch = "TEST_BRANCH"
-      val json = s"""
-                    |{
-                    |  "name": "$name",
-                    |  "uri": "$uri",
-                    |  "source_path": "$sourcePath",
-                    |  "tmp_path": "$tmpPath",
-                    |  "branch": "$branch"
-                    |}
+      val yaml = s"""
+                    |name: $name
+                    |uri: $uri
+                    |source_path: $sourcePath
+                    |tmp_path: $tmpPath
+                    |branch: $branch
       """.stripMargin
       (for  {
-        result <- SourcecodeLoaderConfigLoad.load(Json.parse(json))
+        result <- SourcecodeLoaderConfigYamlLoad.load(yaml.parseYaml)
       } yield {
         result must beSome[SourcecodeLoaderConfig]
         result.get must anInstanceOf[GitBranchLoaderConfig]
@@ -59,22 +54,21 @@ class SourcecodeLoaderConfigLoadSpec(implicit ee: ExecutionEnv) extends Specific
     }
   }
 
-  "git commit reads" should  {
-    "valid git commit json" in {
-      val name = SourcecodeLoaderConfigLoad.gitCommitName
+  "git commit reads" should {
+    "valid git commit yaml" in {
+      val name = SourcecodeLoaderConfigYamlLoad.gitCommitName
       val uri = "TES_URI"
       val tmpPath = "TEST_TMP_PATH"
       val commitHash = "TEST_COMMIT_HASH"
-      val json = s"""
-                    |{
-                    |  "name": "$name",
-                    |  "uri": "$uri",
-                    |  "tmp_path": "$tmpPath",
-                    |  "commit_hash": "$commitHash"
-                    |}
+      val yaml = s"""
+                    |name: $name
+                    |uri: $uri
+                    |tmp_path: $tmpPath
+                    |commit_hash: $commitHash
       """.stripMargin
+      print(s"\n\n\nyaml here,\n\n${yaml.parseYaml}\n\n")
       (for {
-        result <- SourcecodeLoaderConfigLoad.load(Json.parse(json))
+        result <- SourcecodeLoaderConfigYamlLoad.load(yaml.parseYaml)
       } yield {
         result must beSome[SourcecodeLoaderConfig]
         result.get must anInstanceOf[GitCommitLoaderConfig]

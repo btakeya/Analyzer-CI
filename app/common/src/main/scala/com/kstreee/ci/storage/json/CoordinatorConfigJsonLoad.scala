@@ -1,27 +1,15 @@
 package com.kstreee.ci.storage.json
 
-import com.kstreee.ci.util._
 import com.kstreee.ci.coordinator.CoordinatorConfig
 import com.kstreee.ci.coordinator.cli.CLICoordinatorConfig
 import com.kstreee.ci.coordinator.file.FileCoordinatorConfig
-import com.kstreee.ci.storage.ConfigLoad
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
 
-import scala.concurrent.{ExecutionContext, Future}
-
-object CoordinatorConfigLoad extends ConfigLoad {
+object CoordinatorConfigJsonLoad extends ConfigJsonLoad {
   private val logger = Logger[this.type]
 
   override type U = CoordinatorConfig
-  override def load(data: T)(implicit ctx: ExecutionContext): Future[Option[U]] = {
-    val config =
-      for {
-        name <- (JsPath \ "name").read[String].reads(data)
-        config <- loadConfigByName(name, data)
-      } yield config
-    Future(asOption(config, (e: JsError) => logger.error("Failed to parse config,", e)))
-  }
 
   private[json] val cliName: String = "cli"
   private[json] val cliReads: Reads[CoordinatorConfig] =
@@ -30,7 +18,7 @@ object CoordinatorConfigLoad extends ConfigLoad {
   private[json] val fileReads: Reads[CoordinatorConfig] =
     (JsPath \ "report_path").read[String].map(FileCoordinatorConfig.apply)
 
-  private[json] def loadConfigByName(name: String, data: T): JsResult[U] = {
+  def loadConfigByName(name: String, data: T): JsResult[U] = {
     name match {
       case _ if cliName.equalsIgnoreCase(name) => cliReads.reads(data)
       case _ if fileName.equalsIgnoreCase(name) => fileReads.reads(data)

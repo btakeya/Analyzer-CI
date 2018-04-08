@@ -1,6 +1,7 @@
 package com.kstreee.ci
 
 import com.typesafe.scalalogging.Logger
+import net.jcazevedo.moultingyaml.{YamlObject, YamlString, YamlValue}
 import play.api.libs.json.{JsError, JsPath, JsResult, JsonValidationError}
 import play.api.libs.ws.ahc._
 
@@ -107,5 +108,18 @@ package object util {
 
   def asOption[T](x: JsResult[T], f: JsError => Unit): Option[T] = {
     tap(x, f).asOpt
+  }
+
+  def yamlToString(x: YamlValue, f: Throwable => Unit): Option[String] = {
+    x match {
+      case (s: YamlString) => asOption(s.value, (str: String) => str != null && !str.isEmpty, f)
+      case _ =>
+        f(new Exception(s"Failed to get string from yaml value, $x"))
+        None
+    }
+  }
+
+  def yamlByKey(obj: YamlValue, key: YamlValue, f: Throwable => Unit): Option[YamlValue] = {
+    asOption(obj.asYamlObject.fields.get(key), f).flatten
   }
 }

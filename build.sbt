@@ -27,6 +27,8 @@ lazy val commonSettings = Seq(
   resolvers += "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases",
   resolvers += DefaultMavenRepository,
 
+  // YAML libraries
+  libraryDependencies += "net.jcazevedo" %% "moultingyaml" % "0.4.0",
   // Logging libraries
   libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3",
   libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0",

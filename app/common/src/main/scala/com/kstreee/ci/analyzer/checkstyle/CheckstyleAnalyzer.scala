@@ -3,20 +3,18 @@ package com.kstreee.ci.analyzer.checkstyle
 import com.kstreee.ci.analysis.AnalysisReport
 import com.kstreee.ci.util._
 import com.kstreee.ci.analyzer.Analyzer
+import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
-import scalaz.OptionT._
 
-case class CheckstyleAnalyzer(analyzerConfig: CheckstyleAnalyzerConfig) extends Analyzer {
+case class CheckstyleAnalyzer(config: CheckstyleAnalyzerConfig) extends Analyzer {
+  private val logger: Logger = Logger[this.type]
+
   override def buildCmd(implicit ctx: ExecutionContext): Future[Option[Seq[String]]] = {
-    optionT(lift(analyzerConfig.analysisCmd)).run
+    Future(asOption(config.analysisCmd, (th: Throwable) => logger.error(s"Failed to get analysis cmd.", th)))
   }
 
   override def parse(result: String)(implicit ctx: ExecutionContext): Future[Option[AnalysisReport]] = {
     Future(None)
-  }
-
-  private[checkstyle] def normalize(summary: CheckstyleAnalyzerSummary)(implicit ctx: ExecutionContext): Option[AnalysisReport] = {
-    None
   }
 }

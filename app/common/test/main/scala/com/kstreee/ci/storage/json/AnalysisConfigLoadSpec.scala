@@ -1,7 +1,7 @@
 package com.kstreee.ci.storage.json
 
 import com.kstreee.ci.analysis.AnalysisConfig
-import com.kstreee.ci.analyzer.pylint.PylintAnalyzerConfig
+import com.kstreee.ci.analyzer.pylint.{PylintAnalyzerConfig, PylintAnalyzerReportFormat}
 import com.kstreee.ci.coordinator.cli.CLICoordinatorConfig
 import com.kstreee.ci.reporter.cli.plain.CLIPlainReporterConfig
 import com.kstreee.ci.sourcecode.loader.fs.FileSystemSourcecodeLoaderConfig
@@ -15,6 +15,7 @@ class AnalysisConfigLoadSpec(implicit ee: ExecutionEnv) extends Specification {
       // PylintAnalyzer
       val analyzerName = AnalyzerConfigLoad.pylintName
       val analysisCmd = Seq("1", "2", "3")
+      val reportFormat = "json"
       // CLICoordinator
       val coordinatorName = CoordinatorConfigLoad.cliName
       val timeoutSeconds = 123
@@ -27,7 +28,8 @@ class AnalysisConfigLoadSpec(implicit ee: ExecutionEnv) extends Specification {
                |{
                |  "analyzer": {
                |    "name": "$analyzerName",
-               |    "analysis_cmd": "${analysisCmd.mkString(" ")}"
+               |    "analysis_cmd": "${analysisCmd.mkString(" ")}",
+               |    "report_format": "$reportFormat"
                |  },
                |  "coordinator": {
                |    "name": "$coordinatorName",
@@ -50,6 +52,7 @@ class AnalysisConfigLoadSpec(implicit ee: ExecutionEnv) extends Specification {
 
         result.get.analyzerConfig must anInstanceOf[PylintAnalyzerConfig]
         result.get.analyzerConfig.asInstanceOf[PylintAnalyzerConfig].analysisCmd must containTheSameElementsAs(analysisCmd)
+        result.get.analyzerConfig.asInstanceOf[PylintAnalyzerConfig].reportFormat mustEqual PylintAnalyzerReportFormat.Json
 
         result.get.coordinatorConfig must anInstanceOf[CLICoordinatorConfig]
         result.get.coordinatorConfig.asInstanceOf[CLICoordinatorConfig].timeoutSeconds must beSome(timeoutSeconds)

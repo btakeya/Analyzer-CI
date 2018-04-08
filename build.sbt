@@ -6,6 +6,7 @@ lazy val commonSettings = Seq(
   organization := "com.kstreee.ci",
   version := "1.0.0",
   scalaVersion := "2.12.4",
+  isSnapshot := true,
 
   // Scala options
   scalaSource in Compile := baseDirectory.value / "src/main/scala",

@@ -3,6 +3,7 @@ package com.kstreee.ci.storage.json
 import com.kstreee.ci.util._
 import com.kstreee.ci.coordinator.CoordinatorConfig
 import com.kstreee.ci.coordinator.cli.CLICoordinatorConfig
+import com.kstreee.ci.coordinator.file.FileCoordinatorConfig
 import com.kstreee.ci.storage.ConfigLoad
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
@@ -24,11 +25,15 @@ object CoordinatorConfigLoad extends ConfigLoad {
 
   private[json] val cliName: String = "cli"
   private[json] val cliReads: Reads[CoordinatorConfig] =
-    (JsPath \ "timeout_seconds").readNullable[Int].map(timeoutSeconds => CLICoordinatorConfig(timeoutSeconds))
+    (JsPath \ "timeout_seconds").readNullable[Int].map(CLICoordinatorConfig.apply)
+  private[json] val fileName: String = "file"
+  private[json] val fileReads: Reads[CoordinatorConfig] =
+    (JsPath \ "report_path").read[String].map(FileCoordinatorConfig.apply)
 
   private[json] def loadConfigByName(name: String, data: T): JsResult[U] = {
     name match {
       case _ if cliName.equalsIgnoreCase(name) => cliReads.reads(data)
+      case _ if fileName.equalsIgnoreCase(name) => fileReads.reads(data)
       case _ =>
         logger.warn(s"Not implemented, $name")
         JsError(s"Not implemented, $name")

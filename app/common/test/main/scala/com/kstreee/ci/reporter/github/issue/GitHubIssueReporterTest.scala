@@ -3,7 +3,7 @@ package com.kstreee.ci.reporter.github.issue
 import java.net.ConnectException
 
 import com.kstreee.ci.analysis.{AnalysisReport, AnalysisReportItem}
-import com.kstreee.ci.analyzer.pylint.PylintAnalyzerConfig
+import com.kstreee.ci.analyzer.pylint.{PylintAnalyzerConfig, PylintAnalyzerReportFormat}
 import com.kstreee.ci.common.{AhcActorSystem, AhcActorSystemTestContext}
 import com.kstreee.ci.reporter.Reporter
 import org.specs2.concurrent.ExecutionEnv
@@ -24,7 +24,7 @@ class GitHubIssueReporterTest(implicit ee: ExecutionEnv) extends Specification {
         None
       )
 
-      val analyzerConfig = PylintAnalyzerConfig(List())
+      val analyzerConfig = PylintAnalyzerConfig(List(), PylintAnalyzerReportFormat.Json)
       val analysisReportItem = AnalysisReportItem(
         "path",
         "filename",

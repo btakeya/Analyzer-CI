@@ -34,7 +34,12 @@ case class GitHubIssueReporter(config: GitHubIssueReporterConfig, ahcActorSystem
         ()
       }
     val future = report.run
-    future.foreach(_ => wsClient.foreach(_.close))
+    future.foreach { _ =>
+      wsClient.foreach { client =>
+        logger.info(s"Cleaning up wsClient")
+        client.close()
+      }
+    }
     future
   }
 

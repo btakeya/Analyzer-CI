@@ -2,11 +2,12 @@ package com.kstreee.ci.storage.json
 
 import com.kstreee.ci.util._
 import com.kstreee.ci.analyzer.AnalyzerConfig
-import com.kstreee.ci.analyzer.checkstyle.CheckstyleAnalyzerConfig
-import com.kstreee.ci.analyzer.pylint.PylintAnalyzerConfig
+import com.kstreee.ci.analyzer.pylint.{PylintAnalyzerConfig, PylintAnalyzerReportFormat}
+import com.kstreee.ci.analyzer.checkstyle.{CheckstyleAnalyzerConfig, CheckstyleAnalyzerReportFormat}
 import com.kstreee.ci.storage.ConfigLoad
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json.{JsError, JsPath, JsResult, Reads}
+import play.api.libs.functional.syntax._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -24,11 +25,16 @@ object AnalyzerConfigLoad extends ConfigLoad {
   }
 
   private[json] val pylintName: String = "pylint"
-  private[json] implicit val pylintReads: Reads[AnalyzerConfig] =
-    (JsPath \ "analysis_cmd").read[String].map[Seq[String]](s => s.trim.split("\\s+")).map(PylintAnalyzerConfig.apply)
-  private[json] val checkstyleName: String = "pylint"
-  private[json] implicit val checkstyleReads: Reads[AnalyzerConfig] =
-    (JsPath \ "analysis_cmd").read[String].map[Seq[String]](s => s.trim.split("\\s+")).map(CheckstyleAnalyzerConfig.apply)
+  private[json] implicit val pylintReads: Reads[AnalyzerConfig] = (
+    (JsPath \ "analysis_cmd").read[String].map[Seq[String]](s => s.trim.split("\\s+")) and
+      (JsPath \ "report_format").read[String].map[PylintAnalyzerReportFormat.ReportType](PylintAnalyzerReportFormat.ofString)
+    ) (PylintAnalyzerConfig.apply _)
+
+  private[json] val checkstyleName: String = "checkstyle"
+  private[json] implicit val checkstyleReads: Reads[AnalyzerConfig] = (
+    (JsPath \ "analysis_cmd").read[String].map[Seq[String]](s => s.trim.split("\\s+")) and
+      (JsPath \ "report_format").read[String].map[CheckstyleAnalyzerReportFormat.ReportType](CheckstyleAnalyzerReportFormat.ofString)
+    ) (CheckstyleAnalyzerConfig.apply _)
 
   private[json] def loadConfigByName(name: String, data: T): JsResult[U] = {
     name match {

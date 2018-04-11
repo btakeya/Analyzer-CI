@@ -14,6 +14,7 @@ object CoordinatorConfigJsonLoad extends ConfigJsonLoad {
   override type U = CoordinatorConfig
 
   // To support Java
+  override def load(data: T)(implicit ctx: ExecutionContext): Future[Option[U]] = super.load(data)
   override def loadByString(data: String)(implicit ctx: ExecutionContext): Future[Option[U]] = super.loadByString(data)
 
   private[json] val cliName: String = "cli"

@@ -46,7 +46,7 @@ class ReporterConfigYamlLoadSpec(implicit ee: ExecutionEnv) extends Specificatio
       val githubApiBaseUrl = "TEST_BASE_API_URL"
       val owner = "TEST_OWENR"
       val repo = "TEST_REPO"
-      val number = 8
+      val number = "8"
       val token = "TEST_TOKEN"
       val yaml = s"""
                     |name: $name

@@ -50,7 +50,7 @@ class ReporterConfigJsonLoadSpec(implicit ee: ExecutionEnv) extends Specificatio
       val githubApiBaseUrl = "TEST_BASE_API_URL"
       val owner = "TEST_OWENR"
       val repo = "TEST_REPO"
-      val number = 8
+      val number = "8"
       val token = "TEST_TOKEN"
       val json = s"""
                     |{
@@ -59,7 +59,7 @@ class ReporterConfigJsonLoadSpec(implicit ee: ExecutionEnv) extends Specificatio
                     |  "github_api_base_url": "$githubApiBaseUrl",
                     |  "owner": "$owner",
                     |  "repo": "$repo",
-                    |  "number": $number,
+                    |  "number": "$number",
                     |  "token": "$token"
                     |}
       """.stripMargin

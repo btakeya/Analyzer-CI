@@ -9,7 +9,7 @@ import com.kstreee.ci.reporter.Reporter
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.mutable.Specification
 
-class GitHubIssueReporterTest(implicit ee: ExecutionEnv) extends Specification {
+class GitHubIssueReporterSpec(implicit ee: ExecutionEnv) extends Specification {
   implicit val ahcActorSystem: AhcActorSystem = AhcActorSystem()
   "reporter" should {
     "work http client with custom akka config" in new AhcActorSystemTestContext(ahcActorSystem) {
@@ -18,7 +18,7 @@ class GitHubIssueReporterTest(implicit ee: ExecutionEnv) extends Specification {
         "http://localhost:10201",
         "owner",
         "repo",
-        0,
+        "0",
         "token",
         None,
         None

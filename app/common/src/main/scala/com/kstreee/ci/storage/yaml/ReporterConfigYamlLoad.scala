@@ -16,6 +16,7 @@ object ReporterConfigYamlLoad extends ConfigYamlLoad {
   override type U = ReporterConfig
 
   // To support Java
+  override def load(data: T)(implicit ctx: ExecutionContext): Future[Option[U]] = super.load(data)
   override def loadByString(data: String)(implicit ctx: ExecutionContext): Future[Option[U]] = super.loadByString(data)
 
   private[yaml] val cliPlainName: String = "cli_plain"
@@ -31,14 +32,12 @@ object ReporterConfigYamlLoad extends ConfigYamlLoad {
       YamlString("github_api_base_url"),
       YamlString("owner"),
       YamlString("repo"),
-      YamlString("number"),
       YamlString("token")) match {
       case Seq(
       YamlString(githubBaseUrl),
       YamlString(githubApiBaseUrl),
       YamlString(owner),
       YamlString(repo),
-      YamlNumber(number),
       YamlString(token)) =>
         val branch =
           yamlValueByKey(data, YamlString("branch"), (_: Throwable) => ())
@@ -46,16 +45,10 @@ object ReporterConfigYamlLoad extends ConfigYamlLoad {
         val commitSha =
           yamlValueByKey(data, YamlString("commit_sha"), (_: Throwable) => ())
             .flatMap(value => yamlToString(value, (th: Throwable) => logger.info(s"Failed to get source_path from git_branch config, $value}", th)))
-
-        Some(GitHubIssueReporterConfig(
-          githubBaseUrl,
-          githubApiBaseUrl,
-          owner,
-          repo,
-          number.toInt,
-          token,
-          branch,
-          commitSha))
+        val number =
+          yamlValueByKey(data, YamlString("number"), (th: Throwable) => logger.error(s"Failed to get issue number, $data", th))
+              .flatMap(value => yamlToString(value, (th: Throwable) => logger.error(s"Failed to get issue number, $value", th)))
+        number.map(n => GitHubIssueReporterConfig(githubBaseUrl, githubApiBaseUrl, owner, repo, n, token, branch, commitSha))
       case _ =>
         logger.error(s"Failed to parse config for github issue reporter, $data")
         None

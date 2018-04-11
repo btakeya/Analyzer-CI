@@ -13,6 +13,7 @@ object AnalyzerConfigYamlLoad extends ConfigYamlLoad {
   override type U = AnalyzerConfig
 
   // To support Java
+  override def load(data: T)(implicit ctx: ExecutionContext): Future[Option[U]] = super.load(data)
   override def loadByString(data: String)(implicit ctx: ExecutionContext): Future[Option[U]] = super.loadByString(data)
 
   private[yaml] val pylintName: String = "pylint"

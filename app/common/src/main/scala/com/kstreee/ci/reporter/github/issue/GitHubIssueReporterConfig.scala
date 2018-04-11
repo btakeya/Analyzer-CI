@@ -6,7 +6,7 @@ case class GitHubIssueReporterConfig(githubBaseUrl: String,
                                      githubApiBaseUrl: String,
                                      owner: String,
                                      repo: String,
-                                     number: Int,
+                                     number: String,
                                      token: String,
                                      branch: Option[String] = None,
                                      commitSha: Option[String] = None) extends ReporterConfig {

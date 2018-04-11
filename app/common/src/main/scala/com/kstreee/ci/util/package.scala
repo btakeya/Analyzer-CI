@@ -4,6 +4,7 @@ import com.typesafe.scalalogging.Logger
 import net.jcazevedo.moultingyaml._
 import play.api.libs.json.{JsError, JsResult}
 import play.api.libs.ws.ahc._
+import net.jcazevedo.moultingyaml._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -113,17 +114,37 @@ package object util {
   def yamlToString(x: YamlValue, f: Throwable => Unit): Option[String] = {
     x match {
       case (s: YamlString) => asOption(s.value, (str: String) => str != null && !str.isEmpty, f)
+      case (n: YamlNumber) => asOption(n.value.toString, (str: String) => str != null && !str.isEmpty, f)
       case _ =>
         f(new Exception(s"Failed to get string from yaml value, $x"))
         None
     }
   }
 
-  def yamlValueByKey(obj: YamlValue, key: YamlValue, f: Throwable => Unit): Option[YamlValue] = {
-    asOption(obj.asYamlObject.fields.get(key), f).flatten
+  def yamlValueByKey(value: YamlValue, key: YamlValue, f: Throwable => Unit): Option[YamlValue] = {
+    asOption(value.asYamlObject.fields.get(key), f).flatten
   }
 
-  def parseYaml(s: String): YamlValue = {
-    s.parseYaml
+  // Helper method to interop with Java
+  def parseYaml(data: String): YamlValue = {
+    data.parseYaml
+  }
+
+  def yamlMap(value: YamlValue, mapper: (String => String)): YamlValue = {
+    value match {
+      case (set: YamlSet) =>
+        logger.info(s"map set, $set")
+        YamlSet(set.set.map(yamlMap(_, mapper)))
+      case (lst: YamlArray) =>
+        logger.info(s"map arr, $lst")
+        YamlArray(lst.elements.map(yamlMap(_, mapper)))
+      case (obj: YamlObject) =>
+        logger.info(s"map map, $obj")
+        YamlObject(obj.fields.map { case (k, v) => (k, yamlMap(v, mapper)) })
+      case YamlString(str) =>
+        logger.info(s"map str to str, $str -> ${mapper(str)}")
+        YamlString(mapper(str))
+      case _ => value
+    }
   }
 }

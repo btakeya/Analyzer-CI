@@ -7,6 +7,7 @@ import com.kstreee.ci.coordinator.CoordinatorConfig;
 import com.kstreee.ci.reporter.ReporterConfig;
 import com.kstreee.ci.sourcecode.loader.SourcecodeLoaderConfig;
 import com.kstreee.ci.sourcecode.loader.fs.FileSystemSourcecodeLoaderConfig;
+import com.kstreee.ci.util.package$;
 import com.kstreee.ci.storage.yaml.*;
 import hudson.*;
 import hudson.model.AbstractProject;
@@ -19,6 +20,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 
 import hudson.util.FormValidation;
 import jenkins.model.Jenkins;
@@ -36,7 +38,7 @@ import scala.concurrent.ExecutionContext$;
 
 import javax.annotation.Nonnull;
 
-// public class JenkinsApp extends Builder implements SimpleBuildStep, Analysis {
+
 public class AnalyzerCI extends Builder implements SimpleBuildStep {
   private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -52,8 +54,7 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
           final String analyzerConfig,
           final String coordinatorConfig,
           final String reporterConfig,
-          final Boolean runOnBackground
-  ) {
+          final Boolean runOnBackground) {
     this.analyzerConfig = analyzerConfig;
     this.coordinatorConfig = coordinatorConfig;
     this.reporterConfig = reporterConfig;
@@ -83,6 +84,8 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
           @Nonnull Launcher launcher,
           @Nonnull TaskListener listener) {
     try {
+      EnvVars envVars = run.getEnvironment(listener);
+
       DescriptorImpl checker = new DescriptorImpl();
       if (checker.doCheckAnalyzerConfig(analyzerConfig).kind != FormValidation.Kind.OK) {
         listener.getLogger().println("Failed to handle analyzer config");
@@ -94,14 +97,44 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
         listener.getLogger().println("Failed to handle coordinator config");
       }
 
+      Function<String, String> instantiateEnvVar = value -> {
+        if (value == null || !value.startsWith("${") || !value.endsWith("}")) {
+          return value;
+        } else if (envVars.containsKey(value.substring(2, value.length() - 1))) {
+          String replacedValue = envVars.getOrDefault(value.substring(2, value.length() - 1), value);
+          logger.info("Try to replace value {} into {}", value.substring(2, value.length() - 1), replacedValue);
+          return replacedValue;
+        } else {
+          return value;
+        }
+      };
+
+      listener.getLogger().println(String.format(
+              "analyzer config is\n%s\nparsed analyzer config is\n%s\nprocessed analyzer config is\n%s",
+              analyzerConfig,
+              package$.MODULE$.parseYaml(analyzerConfig),
+              package$.MODULE$.yamlMap(package$.MODULE$.parseYaml(analyzerConfig), instantiateEnvVar::apply)));
+      listener.getLogger().println(String.format(
+              "coordinator config is\n%s\nparsed coordinator config is\n%s\nprocessed coordinator config is\n%s",
+              coordinatorConfig,
+              package$.MODULE$.parseYaml(coordinatorConfig),
+              package$.MODULE$.yamlMap(package$.MODULE$.parseYaml(coordinatorConfig), instantiateEnvVar::apply)));
+      listener.getLogger().println(String.format(
+              "reporter config is\n%s\nparsed reporter config is\n%s\nprocessed reporter config is\n%s",
+              reporterConfig,
+              package$.MODULE$.parseYaml(reporterConfig),
+              package$.MODULE$.yamlMap(package$.MODULE$.parseYaml(reporterConfig), instantiateEnvVar::apply)));
       // Analyzer config
-      Future<Option<AnalyzerConfig>> analyzerConfigF =
-              AnalyzerConfigYamlLoad.loadByString(analyzerConfig, ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
+      CompletionStage<Optional<AnalyzerConfig>> analyzerConfigC = convertToJava(
+              AnalyzerConfigYamlLoad.load(
+                      package$.MODULE$.yamlMap(package$.MODULE$.parseYaml(analyzerConfig), instantiateEnvVar::apply),
+                      ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
 
       // Coordinator config
-      Future<Option<CoordinatorConfig>> coordinatorConfigF = CoordinatorConfigYamlLoad.loadByString(
-              coordinatorConfig,
-              ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
+      CompletionStage<Optional<CoordinatorConfig>> coordinatorConfigC = convertToJava(
+              CoordinatorConfigYamlLoad.load(
+                      package$.MODULE$.yamlMap(package$.MODULE$.parseYaml(coordinatorConfig), instantiateEnvVar::apply),
+                      ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
 
       // Sourcecode loader config
       SourcecodeLoaderConfig sourcecodeLoaderConfig = new FileSystemSourcecodeLoaderConfig(
@@ -109,13 +142,14 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
               OptionConverters.toScala(Optional.empty()));
 
       // Reporter config
-      Future<Option<ReporterConfig>> reporterConfigF = ReporterConfigYamlLoad.loadByString(
-              reporterConfig,
-              ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor()));
+      CompletionStage<Optional<ReporterConfig>> reporterConfigC = convertToJava(
+              ReporterConfigYamlLoad.load(
+                      package$.MODULE$.yamlMap(package$.MODULE$.parseYaml(reporterConfig), instantiateEnvVar::apply),
+                      ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
 
       // Perform analysis
       CompletableFuture<Optional<Void>> performedAnalysis =
-              performAnalysis(listener, analyzerConfigF, coordinatorConfigF, sourcecodeLoaderConfig, reporterConfigF)
+              performAnalysis(listener, analyzerConfigC, coordinatorConfigC, sourcecodeLoaderConfig, reporterConfigC)
                       .toCompletableFuture()
                       .thenApply(r -> {
                         listener.getLogger().println("Analysis Done.");
@@ -126,6 +160,7 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
                         e.printStackTrace(listener.getLogger());
                         return Optional.empty();
                       });
+
       if (!runOnBackground) {
         performedAnalysis.join();
       }
@@ -136,34 +171,28 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
     }
   }
 
+  private <T> CompletionStage<Optional<T>> convertToJava(Future<Option<T>> x) {
+    return FutureConverters.toJava(x).thenApply(OptionConverters::toJava);
+  }
+
   private CompletionStage<Optional<Void>> performAnalysis(
           @Nonnull final TaskListener listener,
-          @Nonnull final Future<Option<AnalyzerConfig>> analyzerConfigF,
-          @Nonnull final Future<Option<CoordinatorConfig>> coordinatorConfigF,
+          @Nonnull final CompletionStage<Optional<AnalyzerConfig>> analyzerConfigC,
+          @Nonnull final CompletionStage<Optional<CoordinatorConfig>> coordinatorConfigC,
           @Nonnull final SourcecodeLoaderConfig sourcecodeLoaderConfig,
-          @Nonnull final Future<Option<ReporterConfig>> reporterConfigF) {
-    CompletionStage<Optional<AnalyzerConfig>> analyzerConfigC = FutureConverters
-            .toJava(analyzerConfigF)
-            .thenApply(OptionConverters::toJava);
-    CompletionStage<Optional<CoordinatorConfig>> coordinatorConfigC = FutureConverters
-            .toJava(coordinatorConfigF)
-            .thenApply(OptionConverters::toJava);
-    CompletionStage<Optional<ReporterConfig>> reporterConfigC = FutureConverters
-            .toJava(reporterConfigF)
-            .thenApply(OptionConverters::toJava);
-
-    return analyzerConfigC.thenCompose(analyzerConfigO -> coordinatorConfigC.thenCompose(coordinatorConfigO -> reporterConfigC.thenCompose(reporterCOnfigO -> {
+          @Nonnull final CompletionStage<Optional<ReporterConfig>> reporterConfigC) {
+    return analyzerConfigC.thenCompose(analyzerConfigO -> coordinatorConfigC.thenCompose(coordinatorConfigO -> reporterConfigC.thenCompose(reporterConfigO -> {
       if (!analyzerConfigO.isPresent()) {
         listener.getLogger().println("Failed to load analyzer config.");
         return CompletableFuture.completedFuture(Optional.empty());
       } else if (!coordinatorConfigO.isPresent()) {
         listener.getLogger().println("Failed to load coordinator config.");
         return CompletableFuture.completedFuture(Optional.empty());
-      } else if (!reporterCOnfigO.isPresent()) {
+      } else if (!reporterConfigO.isPresent()) {
         listener.getLogger().println("Failed to load reporter config.");
         return CompletableFuture.completedFuture(Optional.empty());
       } else {
-        AnalysisConfig analysisConfig = new AnalysisConfig(analyzerConfigO.get(), coordinatorConfigO.get(), sourcecodeLoaderConfig, reporterCOnfigO.get());
+        AnalysisConfig analysisConfig = new AnalysisConfig(analyzerConfigO.get(), coordinatorConfigO.get(), sourcecodeLoaderConfig, reporterConfigO.get());
         listener.getLogger().println(String.format("Start to analyze target program.\n%s\n", analysisConfig.toString()));
         Analysis analysis = new Analysis(
                 analysisConfig,
@@ -192,8 +221,8 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
       if (!ReporterConfigYamlLoad.isValidYaml(analyzerConfig)) {
         return FormValidation.error("Not a valid Yaml.");
       } else {
-        return doCheckFO(AnalyzerConfigYamlLoad.loadByString(
-                analyzerConfig,
+        return doCheckFO(AnalyzerConfigYamlLoad.load(
+                package$.MODULE$.parseYaml(analyzerConfig),
                 ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
       }
     }
@@ -202,8 +231,8 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
       if (!ReporterConfigYamlLoad.isValidYaml(coordinatorConfig)) {
         return FormValidation.error("Not a valid Yaml.");
       } else {
-        return doCheckFO(CoordinatorConfigYamlLoad.loadByString(
-                coordinatorConfig,
+        return doCheckFO(CoordinatorConfigYamlLoad.load(
+                package$.MODULE$.parseYaml(coordinatorConfig),
                 ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
       }
     }
@@ -212,8 +241,8 @@ public class AnalyzerCI extends Builder implements SimpleBuildStep {
       if (!ReporterConfigYamlLoad.isValidYaml(reporterConfig)) {
         return FormValidation.error("Not a valid Yaml.");
       } else {
-        return doCheckFO(ReporterConfigYamlLoad.loadByString(
-                reporterConfig,
+        return doCheckFO(ReporterConfigYamlLoad.load(
+                package$.MODULE$.parseYaml(reporterConfig),
                 ExecutionContext$.MODULE$.fromExecutor(new CurrentThreadExecutor())));
       }
     }

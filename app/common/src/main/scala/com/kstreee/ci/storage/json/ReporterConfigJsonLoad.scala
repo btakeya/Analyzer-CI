@@ -16,6 +16,7 @@ object ReporterConfigJsonLoad extends ConfigJsonLoad {
   override type U = ReporterConfig
 
   // To support Java
+  override def load(data: T)(implicit ctx: ExecutionContext): Future[Option[U]] = super.load(data)
   override def loadByString(data: String)(implicit ctx: ExecutionContext): Future[Option[U]] = super.loadByString(data)
 
   private[json] val cliPlainName: String = "cli_plain"
@@ -28,7 +29,7 @@ object ReporterConfigJsonLoad extends ConfigJsonLoad {
       (JsPath \ "github_api_base_url").read[String] and
       (JsPath \ "owner").read[String] and
       (JsPath \ "repo").read[String] and
-      (JsPath \ "number").read[Int] and
+      (JsPath \ "number").read[String] and
       (JsPath \ "token").read[String] and
       (JsPath \ "branch").readNullable[String] and
       (JsPath \ "commit_sha").readNullable[String]

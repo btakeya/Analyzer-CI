@@ -16,6 +16,7 @@ object SourcecodeLoaderConfigYamlLoad extends ConfigYamlLoad {
   override type U = SourcecodeLoaderConfig
 
   // To support Java
+  override def load(data: T)(implicit ctx: ExecutionContext): Future[Option[U]] = super.load(data)
   override def loadByString(data: String)(implicit ctx: ExecutionContext): Future[Option[U]] = super.loadByString(data)
 
   private[yaml] val fileSystemName: String = "file_system"

@@ -133,16 +133,16 @@ package object util {
   def yamlMap(value: YamlValue, mapper: (String => String)): YamlValue = {
     value match {
       case (set: YamlSet) =>
-        logger.info(s"map set, $set")
+        logger.trace(s"yaml map set, $set")
         YamlSet(set.set.map(yamlMap(_, mapper)))
       case (lst: YamlArray) =>
-        logger.info(s"map arr, $lst")
+        logger.trace(s"yaml map arr, $lst")
         YamlArray(lst.elements.map(yamlMap(_, mapper)))
       case (obj: YamlObject) =>
-        logger.info(s"map map, $obj")
+        logger.trace(s"yaml map map, $obj")
         YamlObject(obj.fields.map { case (k, v) => (k, yamlMap(v, mapper)) })
       case YamlString(str) =>
-        logger.info(s"map str to str, $str -> ${mapper(str)}")
+        logger.trace(s"yaml map str to str, $str -> ${mapper(str)}")
         YamlString(mapper(str))
       case _ => value
     }

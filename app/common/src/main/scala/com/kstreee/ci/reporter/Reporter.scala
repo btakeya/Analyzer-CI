@@ -18,7 +18,9 @@ object Reporter {
   private val logger: Logger = Logger[this.type]
 
   def apply(analysisConfig: AnalysisConfig, actor: Option[AhcActorSystem]): Option[Reporter] =
-    asOption(analysisConfig.reporterConfig, (th: Throwable) => logger.info(s"Failed to get reporter config.", th)).flatMap(config => apply(config, actor))
+    asOption(
+      analysisConfig.reporterConfig,
+      (th: Throwable) => logger.info(s"Failed to get reporter config.", th)).flatMap(config => apply(config, actor))
 
   def apply(config: ReporterConfig, actor: Option[AhcActorSystem]): Option[Reporter] = {
     config match {

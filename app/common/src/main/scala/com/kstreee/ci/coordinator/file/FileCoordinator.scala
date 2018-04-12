@@ -30,7 +30,9 @@ case class FileCoordinator(config: FileCoordinatorConfig,
   private[file] def readReportByFile(basePath: String): Option[String] = {
     for {
       path <- asOption(Paths.get(basePath, config.reportPath), (th: Throwable) => logger.error(s"Failed to get report path.", th))
-      report <- asOption(Try(String.join("\n", Files.readAllLines(path))), (th: Throwable) => logger.error(s"Failed to read file, ${path.toString}", th))
+      report <- asOption(
+        Try(String.join("\n", Files.readAllLines(path))),
+        (th: Throwable) => logger.error(s"Failed to read file, ${path.toString}", th))
     } yield report
   }
 }

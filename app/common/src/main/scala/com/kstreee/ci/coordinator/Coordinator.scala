@@ -4,6 +4,7 @@ import com.kstreee.ci.util._
 import com.kstreee.ci.analysis.AnalysisConfig
 import com.kstreee.ci.analyzer.Analyzer
 import com.kstreee.ci.coordinator.cli.{CLICoordinator, CLICoordinatorConfig}
+import com.kstreee.ci.coordinator.file.{FileCoordinator, FileCoordinatorConfig}
 import com.kstreee.ci.sourcecode.loader.SourcecodeLoader
 import com.kstreee.ci.sourcecode.unloader.SourcecodeUnloader
 import com.typesafe.scalalogging.Logger
@@ -31,6 +32,7 @@ object Coordinator {
   def apply(config: CoordinatorConfig, analyzer: Analyzer, loader: SourcecodeLoader, unloader: Option[SourcecodeUnloader]): Option[Coordinator] = {
     config match {
       case (c: CLICoordinatorConfig) => Some(CLICoordinator(c, analyzer, loader, unloader))
+      case (c: FileCoordinatorConfig) => Some(FileCoordinator(c, loader))
       case _ =>
         logger.error(s"Not Implemented, $config")
         None

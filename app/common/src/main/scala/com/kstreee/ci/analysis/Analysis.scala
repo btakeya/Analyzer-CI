@@ -12,7 +12,6 @@ import scalaz.std.scalaFuture._
 
 case class Analysis(analysisConfig: AnalysisConfig, classLoader: ClassLoader = Thread.currentThread().getContextClassLoader)
                    (implicit ctx: ExecutionContext) {
-
   def analysis: Future[Option[Unit]] = {
     val ahcActorSystem = AhcActorSystem(classLoader)
     val analysis =
